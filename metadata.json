@@ -1,0 +1,7 @@
+{
+  "name": "MintFlow - Gestione Spese AI",
+  "description": "Un'applicazione moderna per la gestione delle spese mensili con insight intelligenti basati su Gemini API, caratterizzata da un design pulito bianco e verde menta.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

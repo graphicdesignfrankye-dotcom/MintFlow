@@ -1,0 +1,111 @@
+
+import React from 'react';
+import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings } from 'lucide-react';
+
+interface LayoutProps {
+  children: React.ReactNode;
+  activeTab: 'dashboard' | 'list' | 'ai' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings') => void;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-gray-800">
+        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
+              <CreditCard className="text-emerald-600 dark:text-emerald-400" size={24} />
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+              MintFlow
+            </span>
+          </div>
+          <div className="hidden md:flex items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
+            <NavButton 
+              active={activeTab === 'dashboard'} 
+              onClick={() => setActiveTab('dashboard')}
+              icon={<LayoutDashboard size={18} />}
+              label="Dashboard"
+            />
+            <NavButton 
+              active={activeTab === 'list'} 
+              onClick={() => setActiveTab('list')}
+              icon={<List size={18} />}
+              label="Spese"
+            />
+            <NavButton 
+              active={activeTab === 'ai'} 
+              onClick={() => setActiveTab('ai')}
+              icon={<BrainCircuit size={18} />}
+              label="AI Insights"
+            />
+            <NavButton 
+              active={activeTab === 'settings'} 
+              onClick={() => setActiveTab('settings')}
+              icon={<Settings size={18} />}
+              label="Impostazioni"
+            />
+          </div>
+        </div>
+      </header>
+
+      <main>{children}</main>
+
+      {/* Bottom Nav for Mobile */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-6 flex items-center justify-around pb-4 transition-colors">
+        <MobileNavButton 
+          active={activeTab === 'dashboard'} 
+          onClick={() => setActiveTab('dashboard')}
+          icon={<LayoutDashboard />}
+          label="Home"
+        />
+        <MobileNavButton 
+          active={activeTab === 'list'} 
+          onClick={() => setActiveTab('list')}
+          icon={<List />}
+          label="Spese"
+        />
+        <MobileNavButton 
+          active={activeTab === 'ai'} 
+          onClick={() => setActiveTab('ai')}
+          icon={<BrainCircuit />}
+          label="AI"
+        />
+        <MobileNavButton 
+          active={activeTab === 'settings'} 
+          onClick={() => setActiveTab('settings')}
+          icon={<Settings />}
+          label="Config"
+        />
+      </nav>
+    </div>
+  );
+};
+
+const NavButton = ({ active, onClick, icon, label }: any) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+      active 
+        ? 'bg-emerald-500 text-white shadow-md font-semibold' 
+        : 'text-emerald-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-700/50'
+    }`}
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
+
+const MobileNavButton = ({ active, onClick, icon, label }: any) => (
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center gap-1 transition-all ${
+      active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'
+    }`}
+  >
+    {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
+    <span className="text-[10px] font-medium">{label}</span>
+  </button>
+);
