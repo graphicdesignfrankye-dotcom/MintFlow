@@ -1,17 +1,18 @@
 
 import React, { useState } from 'react';
 import { Expense, Category, PaymentMethod } from '../types';
-import { Trash2, Search, Filter, Wallet, CreditCard, Banknote, Fuel } from 'lucide-react';
+import { Trash2, Search, Filter, Wallet, CreditCard, Banknote, Fuel, Edit2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface ExpenseListProps {
   expenses: Expense[];
   onDelete: (id: string) => void;
+  onEdit: (expense: Expense) => void;
   currency?: string;
 }
 
-export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, currency = '€' }) => {
+export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit, currency = '€' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<Category | 'Tutti'>('Tutti');
 
@@ -84,16 +85,26 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, cu
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-bold text-gray-800 dark:text-white text-lg">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-800 dark:text-white text-lg mr-2">
                     {currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                   </span>
-                  <button 
-                    onClick={() => onDelete(expense.id)}
-                    className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all">
+                    <button 
+                      onClick={() => onEdit(expense)}
+                      className="p-2 text-gray-300 dark:text-gray-600 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                      title="Modifica"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button 
+                      onClick={() => onDelete(expense.id)}
+                      className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                      title="Elimina"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

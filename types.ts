@@ -16,13 +16,15 @@ export enum PaymentMethod {
   AppQ8 = 'App Q8'
 }
 
+// Added missing Expense interface
 export interface Expense {
   id: string;
-  date: string;
   description: string;
   amount: number;
   category: Category;
   paymentMethod: PaymentMethod;
+  date: string;
+  user_id?: string;
 }
 
 export interface UserSettings {
@@ -30,6 +32,11 @@ export interface UserSettings {
   monthlyBudget: number;
   currency: string;
   isDarkMode: boolean;
+  rechargeLabels: {
+    flash: string;
+    revolut: string;
+    q8: string;
+  };
 }
 
 export interface AiInsight {

@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Expense, Category, PaymentMethod } from "../types";
 
+// Initialize Gemini with API key from environment variable
 const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getGeminiInsights = async (expenses: Expense[]) => {
@@ -42,6 +43,7 @@ export const getGeminiInsights = async (expenses: Expense[]) => {
       }
     });
 
+    // Extract text directly from property
     return JSON.parse(response.text || "[]");
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -64,15 +66,18 @@ export const analyzeReceipt = async (base64Image: string) => {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: base64Image.split(',')[1] || base64Image
-          }
-        },
-        { text: prompt }
-      ],
+      // Fixed: wrapped multimodal input in a parts object
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image.split(',')[1] || base64Image
+            }
+          },
+          { text: prompt }
+        ]
+      },
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -94,6 +99,7 @@ export const analyzeReceipt = async (base64Image: string) => {
       }
     });
 
+    // Extract text directly from property
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Receipt analysis failed:", error);

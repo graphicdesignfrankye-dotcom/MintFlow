@@ -13,9 +13,14 @@ interface DashboardProps {
   budget: number;
   userName?: string;
   currency?: string;
+  rechargeLabels: {
+    flash: string;
+    revolut: string;
+    q8: string;
+  };
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€', rechargeLabels }) => {
   const currentMonth = new Date();
   const currentMonthStart = startOfMonth(currentMonth);
   const currentMonthEnd = endOfMonth(currentMonth);
@@ -53,25 +58,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
 
     return [
       { 
-        name: 'Flash', 
-        value: calculateBalance('Ricarica Prepagata Flash', PaymentMethod.Flash),
+        name: rechargeLabels.flash, 
+        value: calculateBalance(`Ricarica ${rechargeLabels.flash}`, PaymentMethod.Flash),
         icon: <Zap size={14} />,
         color: 'text-emerald-500'
       },
       { 
-        name: 'Revolut', 
-        value: calculateBalance('Ricarica Prepagata Revolut', PaymentMethod.Revolut),
+        name: rechargeLabels.revolut, 
+        value: calculateBalance(`Ricarica ${rechargeLabels.revolut}`, PaymentMethod.Revolut),
         icon: <Wallet size={14} />,
         color: 'text-blue-500'
       },
       { 
-        name: 'App Q8', 
-        value: calculateBalance('Ricarica App Q8', PaymentMethod.AppQ8),
+        name: rechargeLabels.q8, 
+        value: calculateBalance(`Ricarica ${rechargeLabels.q8}`, PaymentMethod.AppQ8),
         icon: <Fuel size={14} />,
         color: 'text-orange-500'
       }
     ];
-  }, [expenses]);
+  }, [expenses, rechargeLabels]);
 
   const categoryData = useMemo(() => {
     const data: Record<string, number> = {};

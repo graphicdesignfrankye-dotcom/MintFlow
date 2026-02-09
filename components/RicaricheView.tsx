@@ -9,20 +9,24 @@ interface RicaricheViewProps {
   onRefill: (type: 'flash' | 'revolut' | 'q8') => void;
   expenses: Expense[];
   currency?: string;
+  labels: {
+    flash: string;
+    revolut: string;
+    q8: string;
+  };
 }
 
-export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses, currency = '€' }) => {
-  // Calcolo dei saldi per ogni opzione
+export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses, currency = '€', labels }) => {
+  // Calcolo dei saldi per ogni opzione utilizzando le etichette personalizzate
   const balances = useMemo(() => {
-    const calculateBalance = (rechargeDesc: string, method: PaymentMethod) => {
+    const calculateBalance = (rechargeName: string, method: PaymentMethod) => {
       // Somma ricariche (entrate nel "portafoglio" specifico)
+      // Cerchiamo la stringa "Ricarica [Nome Personalizzato]"
       const totalRecharged = expenses
-        .filter(e => e.description.toLowerCase().includes(rechargeDesc.toLowerCase()))
+        .filter(e => e.description.toLowerCase().includes(`ricarica ${rechargeName}`.toLowerCase()))
         .reduce((sum, e) => sum + e.amount, 0);
       
       // Somma spese (uscite dal "portafoglio" specifico)
-      // Nota: escludiamo la ricarica stessa per non contare l'uscita due volte 
-      // se la ricarica fosse marcata con lo stesso metodo (solitamente è pagata con contanti o banca)
       const totalSpent = expenses
         .filter(e => e.paymentMethod === method && !e.description.toLowerCase().includes('ricarica'))
         .reduce((sum, e) => sum + e.amount, 0);
@@ -31,16 +35,16 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
     };
 
     return {
-      flash: calculateBalance('Ricarica Prepagata Flash', PaymentMethod.Flash),
-      revolut: calculateBalance('Ricarica Prepagata Revolut', PaymentMethod.Revolut),
-      q8: calculateBalance('Ricarica App Q8', PaymentMethod.AppQ8)
+      flash: calculateBalance(labels.flash, PaymentMethod.Flash),
+      revolut: calculateBalance(labels.revolut, PaymentMethod.Revolut),
+      q8: calculateBalance(labels.q8, PaymentMethod.AppQ8)
     };
-  }, [expenses]);
+  }, [expenses, labels]);
 
   const refillExpenses = useMemo(() => {
     return expenses.filter(e => 
       e.description.toLowerCase().includes('ricarica')
-    ).slice(0, 5);
+    ).slice(0, 10);
   }, [expenses]);
 
   const formatBal = (val: number) => val.toLocaleString('it-IT', { minimumFractionDigits: 2 });
@@ -59,7 +63,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card Prepagata Flash */}
+        {/* Card Flash */}
         <div className="group bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border-2 border-emerald-50 dark:border-gray-700 shadow-sm transition-all flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-4">
@@ -67,14 +71,14 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
                 <Zap size={24} />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Saldo Flash</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[100px]">Saldo {labels.flash}</p>
                 <p className={`text-xl font-black ${balances.flash > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}>
                   {currency}{formatBal(balances.flash)}
                 </p>
               </div>
             </div>
-            <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-1">Prepagata Flash</h3>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500">Carta Intesa Sanpaolo</p>
+            <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-1 truncate">{labels.flash}</h3>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Slot Ricarica 1</p>
           </div>
           <button 
             onClick={() => onRefill('flash')}
@@ -93,14 +97,14 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
                 <Wallet size={24} />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Saldo Revolut</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[100px]">Saldo {labels.revolut}</p>
                 <p className={`text-xl font-black ${balances.revolut > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}>
                   {currency}{formatBal(balances.revolut)}
                 </p>
               </div>
             </div>
-            <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-1">Revolut</h3>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500">Conto Prepagato Estero</p>
+            <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-1 truncate">{labels.revolut}</h3>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Slot Ricarica 2</p>
           </div>
           <button 
             onClick={() => onRefill('revolut')}
@@ -111,7 +115,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
           </button>
         </div>
 
-        {/* Card App Q8 */}
+        {/* Card Q8 */}
         <div className="group bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border-2 border-emerald-50 dark:border-gray-700 shadow-sm transition-all flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-4">
@@ -119,14 +123,14 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
                 <Fuel size={24} />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Credito Q8</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[100px]">Credito {labels.q8}</p>
                 <p className={`text-xl font-black ${balances.q8 > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}>
                   {currency}{formatBal(balances.q8)}
                 </p>
               </div>
             </div>
-            <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-1">App Q8</h3>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500">Credito Carburante</p>
+            <h3 className="font-bold text-gray-800 dark:text-white text-sm mb-1 truncate">{labels.q8}</h3>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Slot Ricarica 3</p>
           </div>
           <button 
             onClick={() => onRefill('q8')}

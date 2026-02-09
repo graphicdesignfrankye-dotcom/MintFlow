@@ -8,10 +8,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper per ottenere l'URL di redirect corretto in base all'ambiente
-const getRedirectUrl = () => {
-  return window.location.origin;
-};
+// Helper per ottenere l'URL di redirect corretto
+const getRedirectUrl = () => window.location.origin;
 
 export const auth = {
   async signUp(email: string, password: string, username: string) {
@@ -31,18 +29,13 @@ export const auth = {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email,
-      options: {
-        emailRedirectTo: getRedirectUrl(),
-      }
+      options: { emailRedirectTo: getRedirectUrl() }
     });
     if (error) throw error;
   },
 
   async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   },
@@ -52,9 +45,40 @@ export const auth = {
     if (error) throw error;
   },
 
-  async getCurrentUser() {
+  async updateProfile(name: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      data: { display_name: name }
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async updateEmail(newEmail: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      email: newEmail
+    }, {
+      emailRedirectTo: getRedirectUrl()
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async updatePassword(password: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      password: password
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteAccount() {
+    // Nota: L'eliminazione completa dell'utente lato auth richiede permessi admin (Edge Function)
+    // Per questa demo, puliamo i dati e disconnettiamo l'utente.
     const { data: { user } } = await supabase.auth.getUser();
-    return user;
+    if (user) {
+      await db.clearAll(user.id);
+      await this.signOut();
+    }
   }
 };
 
@@ -81,21 +105,33 @@ export const db = {
     return data;
   },
 
-  async deleteExpense(id: string): Promise<void> {
-    const { error } = await supabase
+  async updateExpense(id: string, expense: Partial<Omit<Expense, 'id'>>): Promise<Expense> {
+    // Escludiamo campi protetti o superflui
+    const updateData: any = {};
+    if (expense.description !== undefined) updateData.description = expense.description;
+    if (expense.amount !== undefined) updateData.amount = expense.amount;
+    if (expense.category !== undefined) updateData.category = expense.category;
+    if (expense.paymentMethod !== undefined) updateData.paymentMethod = expense.paymentMethod;
+    if (expense.date !== undefined) updateData.date = expense.date;
+
+    const { data, error } = await supabase
       .from('expenses')
-      .delete()
-      .eq('id', id);
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
     
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteExpense(id: string): Promise<void> {
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) throw error;
   },
 
   async clearAll(userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('user_id', userId); 
-    
+    const { error } = await supabase.from('expenses').delete().eq('user_id', userId);
     if (error) throw error;
   }
 };
