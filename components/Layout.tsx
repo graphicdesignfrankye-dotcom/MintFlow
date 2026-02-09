@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings, Zap, Repeat } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche';
-  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche') => void;
+  activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions';
+  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions') => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
@@ -34,6 +34,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               onClick={() => setActiveTab('list')}
               icon={<List size={18} />}
               label="Spese"
+            />
+            <NavButton 
+              active={activeTab === 'subscriptions'} 
+              onClick={() => setActiveTab('subscriptions')}
+              icon={<Repeat size={18} />}
+              label="Abbonamenti"
             />
             <NavButton 
               active={activeTab === 'ricariche'} 
@@ -74,16 +80,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           label="Spese"
         />
         <MobileNavButton 
+          active={activeTab === 'subscriptions'} 
+          onClick={() => setActiveTab('subscriptions')}
+          icon={<Repeat />}
+          label="Subs"
+        />
+        <MobileNavButton 
           active={activeTab === 'ricariche'} 
           onClick={() => setActiveTab('ricariche')}
           icon={<Zap />}
-          label="Ricariche"
-        />
-        <MobileNavButton 
-          active={activeTab === 'ai'} 
-          onClick={() => setActiveTab('ai')}
-          icon={<BrainCircuit />}
-          label="AI"
+          label="Wallet"
         />
         <MobileNavButton 
           active={activeTab === 'settings'} 

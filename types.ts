@@ -6,6 +6,7 @@ export enum Category {
   RicaricaChiavetta = 'Ricarica Chiavetta',
   Svago = 'Svago',
   Salute = 'Salute',
+  Abbonamenti = 'Abbonamenti',
   Altro = 'Altro'
 }
 
@@ -13,10 +14,14 @@ export enum PaymentMethod {
   Contanti = 'Contanti',
   Flash = 'Prepagata Flash',
   Revolut = 'Prepagata Revolut',
-  AppQ8 = 'App Q8'
+  AppQ8 = 'App Q8',
+  Bancomat = 'Bancomat',
+  Wallet4 = 'Wallet Extra 1',
+  Wallet5 = 'Wallet Extra 2',
+  Wallet6 = 'Wallet Extra 3'
 }
 
-// Added missing Expense interface
+// Added Expense interface to fix the "Module has no exported member 'Expense'" errors in multiple files
 export interface Expense {
   id: string;
   description: string;
@@ -24,7 +29,14 @@ export interface Expense {
   category: Category;
   paymentMethod: PaymentMethod;
   date: string;
-  user_id?: string;
+  isSubscription?: boolean;
+}
+
+export interface WalletConfig {
+  id: string;
+  name: string;
+  method: PaymentMethod;
+  icon: 'zap' | 'wallet' | 'fuel' | 'credit-card';
 }
 
 export interface UserSettings {
@@ -32,11 +44,7 @@ export interface UserSettings {
   monthlyBudget: number;
   currency: string;
   isDarkMode: boolean;
-  rechargeLabels: {
-    flash: string;
-    revolut: string;
-    q8: string;
-  };
+  wallets: WalletConfig[];
 }
 
 export interface AiInsight {
