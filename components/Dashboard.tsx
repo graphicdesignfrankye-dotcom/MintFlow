@@ -1,11 +1,10 @@
 
 import React, { useMemo } from 'react';
-import { Expense, Category } from '../types';
+import { Expense, Category, PaymentMethod } from '../types';
 import { 
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid 
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip 
 } from 'recharts';
-import { TrendingDown, TrendingUp, Wallet, Calendar, Target } from 'lucide-react';
+import { Wallet, Calendar, Target, Zap, Fuel, CreditCard } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -38,6 +37,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
   const diff = totalLastMonth > 0 ? ((totalCurrentMonth - totalLastMonth) / totalLastMonth) * 100 : 0;
   const budgetProgress = Math.min((totalCurrentMonth / budget) * 100, 100);
 
+  // Calcolo dei saldi (stessa logica di RicaricheView)
+  const balances = useMemo(() => {
+    const calculateBalance = (rechargeDesc: string, method: PaymentMethod) => {
+      const totalRecharged = expenses
+        .filter(e => e.description.toLowerCase().includes(rechargeDesc.toLowerCase()))
+        .reduce((sum, e) => sum + e.amount, 0);
+      
+      const totalSpent = expenses
+        .filter(e => e.paymentMethod === method && !e.description.toLowerCase().includes('ricarica'))
+        .reduce((sum, e) => sum + e.amount, 0);
+      
+      return Math.max(0, totalRecharged - totalSpent);
+    };
+
+    return [
+      { 
+        name: 'Flash', 
+        value: calculateBalance('Ricarica Prepagata Flash', PaymentMethod.Flash),
+        icon: <Zap size={14} />,
+        color: 'text-emerald-500'
+      },
+      { 
+        name: 'Revolut', 
+        value: calculateBalance('Ricarica Prepagata Revolut', PaymentMethod.Revolut),
+        icon: <Wallet size={14} />,
+        color: 'text-blue-500'
+      },
+      { 
+        name: 'App Q8', 
+        value: calculateBalance('Ricarica App Q8', PaymentMethod.AppQ8),
+        icon: <Fuel size={14} />,
+        color: 'text-orange-500'
+      }
+    ];
+  }, [expenses]);
+
   const categoryData = useMemo(() => {
     const data: Record<string, number> = {};
     currentMonthExpenses.forEach(e => {
@@ -59,6 +94,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
         <p className="text-gray-500 dark:text-gray-400">Ecco lo stato delle tue finanze per questo mese.</p>
       </div>
 
+      {/* Sezione Budget e Statistiche Rapide */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2 bg-emerald-500 dark:bg-emerald-600 p-8 rounded-[2rem] text-white shadow-xl shadow-emerald-200/50 dark:shadow-none relative overflow-hidden">
           <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
@@ -69,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
               <h2 className="text-4xl font-bold mt-1">{formatValue(totalCurrentMonth)}</h2>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-              <Wallet size={24} />
+              <CreditCard size={24} />
             </div>
           </div>
 
@@ -111,9 +147,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
         </div>
       </div>
 
+      {/* Sezione Portafogli (Saldo Residuo) */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
+        <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-6 px-2 flex items-center gap-2">
+          <Wallet size={16} className="text-emerald-500" />
+          Saldi Portafogli
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {balances.map((wallet) => (
+            <div key={wallet.name} className="flex flex-col gap-1 p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/40 border border-transparent hover:border-emerald-100 dark:hover:border-emerald-900/30 transition-all group">
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm ${wallet.color}`}>
+                  {wallet.icon}
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{wallet.name}</span>
+              </div>
+              <p className={`text-xl font-black ${wallet.value > 0 ? 'text-gray-800 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
+                {currency}{wallet.value.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+              </p>
+              <div className="h-1 w-full bg-gray-200 dark:bg-gray-600 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-1000" 
+                  style={{ width: wallet.value > 0 ? '100%' : '0%' }}
+                ></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Grafici e Dettagli */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 px-2">Categorie</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 px-2">Spese per Categoria</h3>
           <div className="h-64">
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">

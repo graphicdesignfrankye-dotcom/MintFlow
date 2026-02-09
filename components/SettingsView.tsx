@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { UserSettings } from '../types';
-import { User, Wallet, DollarSign, Trash2, Download, Info, Moon, Sun, LogOut } from 'lucide-react';
+import { UserSettings, Expense } from '../types';
+import { User, Wallet, DollarSign, Trash2, Download, Info, Moon, Sun, LogOut, FileDown } from 'lucide-react';
 import { auth } from '../services/supabase';
+import { format } from 'date-fns';
 
 interface SettingsViewProps {
   settings: UserSettings;
   onUpdate: (settings: UserSettings) => void;
   onClearData: () => void;
-  expenseCount: number;
+  expenses: Expense[];
   email?: string;
 }
 
@@ -16,7 +17,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   settings, 
   onUpdate, 
   onClearData,
-  expenseCount,
+  expenses,
   email
 }) => {
   const handleChange = (field: keyof UserSettings, value: string | number | boolean) => {
@@ -29,10 +30,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
+  const handleExportCSV = () => {
+    if (expenses.length === 0) {
+      alert("Non ci sono spese da esportare.");
+      return;
+    }
+
+    // Header del CSV
+    const headers = ["Data", "Descrizione", "Categoria", "Metodo Pagamento", "Importo (" + settings.currency + ")"];
+    
+    // Righe del CSV
+    const rows = expenses.map(e => [
+      format(new Date(e.date), 'yyyy-MM-dd'),
+      `"${e.description.replace(/"/g, '""')}"`, // Gestione virgolette nella descrizione
+      e.category,
+      e.paymentMethod || "Non specificato",
+      e.amount.toFixed(2).replace('.', ',') // Formato decimale europeo per Excel
+    ]);
+
+    const csvContent = [
+      headers.join(";"), 
+      ...rows.map(r => r.join(";"))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `mintflow_export_${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Account Section */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
         <div className="flex justify-between items-start mb-6">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
             <User className="text-emerald-500" size={20} />
@@ -49,7 +86,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1 ml-1">Email Collegata</label>
-            <p className="px-5 py-3 rounded-2xl bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium">{email}</p>
+            <p className="px-5 py-3 rounded-2xl bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium truncate">{email}</p>
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 ml-1">Il tuo Nome Visualizzato</label>
@@ -64,7 +101,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Finance Section */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
           <Wallet className="text-emerald-500" size={20} />
           Preferenze Finanziarie
@@ -104,7 +141,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Appearance Section */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
           {settings.isDarkMode ? <Moon className="text-emerald-500" size={20} /> : <Sun className="text-emerald-500" size={20} />}
           Aspetto
@@ -121,10 +158,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Data Management */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
           <Download className="text-emerald-500" size={20} />
-          Dati Cloud
+          Gestione Dati
         </h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl">
@@ -132,10 +169,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <Info className="text-emerald-500" size={20} />
               <div>
                 <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Database Spese</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-500">{expenseCount} transazioni sincronizzate</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-500">{expenses.length} transazioni sincronizzate</p>
               </div>
             </div>
           </div>
+
+          <button 
+            onClick={handleExportCSV}
+            className="w-full flex items-center justify-center gap-2 p-4 bg-white dark:bg-gray-800 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-100 dark:border-gray-700 hover:bg-emerald-50 dark:hover:bg-gray-700 transition-all rounded-2xl font-bold"
+          >
+            <FileDown size={20} />
+            Esporta Tutte le Spese (CSV)
+          </button>
 
           <button 
             onClick={onClearData}
@@ -147,8 +192,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      <div className="text-center text-gray-400 text-xs py-4">
-        MintFlow v1.1.0 • Multi-Device Cloud Sinc
+      <div className="text-center text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] py-4">
+        MintFlow v1.2.0 • Cloud Sinc Attivo
       </div>
     </div>
   );

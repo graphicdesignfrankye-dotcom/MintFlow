@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings } from 'lucide-react';
+import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings, Zap } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'list' | 'ai' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings') => void;
+  activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche';
+  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche') => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
@@ -36,6 +36,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               label="Spese"
             />
             <NavButton 
+              active={activeTab === 'ricariche'} 
+              onClick={() => setActiveTab('ricariche')}
+              icon={<Zap size={18} />}
+              label="Ricariche"
+            />
+            <NavButton 
               active={activeTab === 'ai'} 
               onClick={() => setActiveTab('ai')}
               icon={<BrainCircuit size={18} />}
@@ -54,7 +60,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       <main>{children}</main>
 
       {/* Bottom Nav for Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-6 flex items-center justify-around pb-4 transition-colors">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-2 flex items-center justify-around pb-4 transition-colors">
         <MobileNavButton 
           active={activeTab === 'dashboard'} 
           onClick={() => setActiveTab('dashboard')}
@@ -66,6 +72,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           onClick={() => setActiveTab('list')}
           icon={<List />}
           label="Spese"
+        />
+        <MobileNavButton 
+          active={activeTab === 'ricariche'} 
+          onClick={() => setActiveTab('ricariche')}
+          icon={<Zap />}
+          label="Ricariche"
         />
         <MobileNavButton 
           active={activeTab === 'ai'} 
@@ -87,25 +99,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 const NavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
       active 
         ? 'bg-emerald-500 text-white shadow-md font-semibold' 
         : 'text-emerald-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-700/50'
     }`}
   >
     {icon}
-    <span>{label}</span>
+    <span className="text-sm">{label}</span>
   </button>
 );
 
 const MobileNavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center gap-1 transition-all ${
+    className={`flex flex-col items-center gap-1 transition-all flex-1 ${
       active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'
     }`}
   >
-    {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
-    <span className="text-[10px] font-medium">{label}</span>
+    {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2 })}
+    <span className="text-[9px] font-bold uppercase tracking-tighter">{label}</span>
   </button>
 );

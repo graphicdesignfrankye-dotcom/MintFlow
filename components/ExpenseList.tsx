@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Expense, Category } from '../types';
-import { Trash2, Search, Filter } from 'lucide-react';
+import { Expense, Category, PaymentMethod } from '../types';
+import { Trash2, Search, Filter, Wallet, CreditCard, Banknote, Fuel } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -20,6 +20,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, cu
     const matchesCategory = filterCategory === 'Tutti' || e.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const getPaymentIcon = (method?: PaymentMethod) => {
+    switch (method) {
+      case PaymentMethod.Contanti: return <Banknote size={12} />;
+      case PaymentMethod.Flash: return <CreditCard size={12} />;
+      case PaymentMethod.Revolut: return <Wallet size={12} />;
+      case PaymentMethod.AppQ8: return <Fuel size={12} />;
+      default: return <CreditCard size={12} />;
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -59,11 +69,18 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, cu
                     {expense.category.charAt(0)}
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 dark:text-white">{expense.description}</h4>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-600">{expense.category}</span>
-                      <span>•</span>
-                      <span>{format(new Date(expense.date), 'dd MMM yyyy', { locale: it })}</span>
+                    <h4 className="font-semibold text-gray-800 dark:text-white leading-tight">{expense.description}</h4>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="text-[10px] font-bold bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-600 uppercase tracking-tight">
+                        {expense.category}
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/40 px-2 py-0.5 rounded uppercase tracking-tight">
+                        {getPaymentIcon(expense.paymentMethod)}
+                        {expense.paymentMethod}
+                      </span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">
+                        {format(new Date(expense.date), 'dd MMM yyyy', { locale: it })}
+                      </span>
                     </div>
                   </div>
                 </div>

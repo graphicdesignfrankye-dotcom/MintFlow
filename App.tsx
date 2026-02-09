@@ -7,8 +7,9 @@ import { ExpenseForm } from './components/ExpenseForm';
 import { AiInsights } from './components/AiInsights';
 import { ReceiptScanner } from './components/ReceiptScanner';
 import { SettingsView } from './components/SettingsView';
+import { RicaricheView } from './components/RicaricheView';
 import { Auth } from './components/Auth';
-import { Expense, Category, UserSettings } from './types';
+import { Expense, Category, UserSettings, PaymentMethod } from './types';
 import { Plus, ScanLine, Cloud, Loader2, CreditCard } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
 
@@ -29,7 +30,7 @@ const App: React.FC = () => {
     };
   });
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ai' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings'>('dashboard');
   const [showForm, setShowForm] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
@@ -39,10 +40,14 @@ const App: React.FC = () => {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
+      
       if (session?.user) {
+        const metadata = session.user.user_metadata;
+        const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
+        
         setUserSettings(prev => ({ 
           ...prev, 
-          name: session.user.user_metadata.display_name || prev.name 
+          name: displayName
         }));
       }
       setIsInitialLoading(false);
@@ -52,6 +57,11 @@ const App: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) {
+        const metadata = session.user.user_metadata;
+        const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
+        setUserSettings(prev => ({ ...prev, name: displayName }));
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -87,12 +97,15 @@ const App: React.FC = () => {
   if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4">
-        <div className="bg-emerald-500 p-5 rounded-3xl text-white shadow-2xl animate-bounce">
+        <div className="bg-emerald-500 p-5 rounded-3xl text-white shadow-2xl animate-pulse">
           <CreditCard size={48} />
         </div>
-        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-          <Loader2 size={20} className="animate-spin" />
-          <span>Caricamento sessione...</span>
+        <div className="flex flex-col items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+          <div className="flex items-center gap-2">
+            <Loader2 size={20} className="animate-spin" />
+            <span>Sincronizzazione MintFlow...</span>
+          </div>
+          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Verifica sessione cloud</span>
         </div>
       </div>
     );
@@ -142,6 +155,23 @@ const App: React.FC = () => {
     }
   };
 
+  const handleQuickRefill = (type: 'flash' | 'revolut' | 'q8') => {
+    const config = {
+      flash: { desc: 'Ricarica Prepagata Flash', cat: Category.Altro, method: PaymentMethod.Contanti },
+      revolut: { desc: 'Ricarica Prepagata Revolut', cat: Category.Altro, method: PaymentMethod.Contanti },
+      q8: { desc: 'Ricarica App Q8', cat: Category.Benzina, method: PaymentMethod.Contanti }
+    };
+
+    const selected = config[type];
+    setPrefill({
+      description: selected.desc,
+      category: selected.cat,
+      paymentMethod: selected.method, // La ricarica viene fatta solitamente in contanti
+      date: new Date().toISOString().split('T')[0]
+    });
+    setShowForm(true);
+  };
+
   const handleReceiptDetected = (data: { description: string; amount: number; category: Category }) => {
     setPrefill({
       description: data.description,
@@ -176,7 +206,8 @@ const App: React.FC = () => {
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white transition-colors">
                {activeTab === 'list' ? 'Le tue Spese' : 
-                activeTab === 'ai' ? 'AI Insights' : 'Impostazioni'}
+                activeTab === 'ai' ? 'AI Insights' : 
+                activeTab === 'ricariche' ? 'Ricariche' : 'Impostazioni'}
             </h1>
           </div>
         )}
@@ -219,6 +250,10 @@ const App: React.FC = () => {
               </div>
             )}
 
+            {activeTab === 'ricariche' && (
+              <RicaricheView onRefill={handleQuickRefill} expenses={expenses} currency={userSettings.currency} />
+            )}
+
             {activeTab === 'ai' && <AiInsights expenses={expenses} />}
 
             {activeTab === 'settings' && (
@@ -226,7 +261,7 @@ const App: React.FC = () => {
                 settings={userSettings} 
                 onUpdate={setUserSettings}
                 onClearData={handleClearData}
-                expenseCount={expenses.length}
+                expenses={expenses}
                 email={session.user.email}
               />
             )}
@@ -236,11 +271,11 @@ const App: React.FC = () => {
         {showForm && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative my-auto animate-in zoom-in-95 duration-200 transition-colors">
-              <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">✕</button>
-              <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Dettagli Spesa</h2>
+              <button onClick={() => { setShowForm(false); setPrefill(null); }} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">✕</button>
+              <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">Dettagli Operazione</h2>
               <ExpenseForm 
                 onSubmit={addExpense} 
-                onCancel={() => setShowForm(false)} 
+                onCancel={() => { setShowForm(false); setPrefill(null); }} 
                 initialData={prefill || undefined}
                 currency={userSettings.currency}
               />

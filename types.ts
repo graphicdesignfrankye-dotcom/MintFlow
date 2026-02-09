@@ -1,13 +1,19 @@
 
 export enum Category {
-  Alimentari = 'Alimentari',
-  Trasporti = 'Trasporti',
-  Casa = 'Casa',
+  Sigarette = 'Sigarette',
+  Benzina = 'Benzina',
+  Autostrada = 'Autostrada',
+  RicaricaChiavetta = 'Ricarica Chiavetta',
   Svago = 'Svago',
   Salute = 'Salute',
-  Shopping = 'Shopping',
-  Utenze = 'Utenze',
   Altro = 'Altro'
+}
+
+export enum PaymentMethod {
+  Contanti = 'Contanti',
+  Flash = 'Prepagata Flash',
+  Revolut = 'Prepagata Revolut',
+  AppQ8 = 'App Q8'
 }
 
 export interface Expense {
@@ -16,6 +22,7 @@ export interface Expense {
   description: string;
   amount: number;
   category: Category;
+  paymentMethod: PaymentMethod;
 }
 
 export interface UserSettings {

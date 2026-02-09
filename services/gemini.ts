@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Expense, Category } from "../types";
+import { Expense, Category, PaymentMethod } from "../types";
 
 const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -11,6 +11,7 @@ export const getGeminiInsights = async (expenses: Expense[]) => {
     date: e.date,
     amount: e.amount,
     category: e.category,
+    paymentMethod: e.paymentMethod,
     desc: e.description
   }));
 
@@ -55,7 +56,8 @@ export const analyzeReceipt = async (base64Image: string) => {
   Estrai:
   1. Una breve descrizione (es: Nome negozio o prodotto principale)
   2. L'importo totale (numero decimale)
-  3. La categoria più adatta tra: Alimentari, Trasporti, Casa, Svago, Salute, Shopping, Utenze, Altro.
+  3. La categoria più adatta esclusivamente tra queste: Sigarette, Benzina, Autostrada, Ricarica Chiavetta, Svago, Salute, Altro.
+  4. Il metodo di pagamento probabile tra questi: Contanti, Prepagata Flash, Prepagata Revolut, App Q8. Se non è chiaro o ci sono riferimenti a carte generiche, usa 'Prepagata Flash' come default se sembra elettronico, altrimenti 'Contanti'.
   
   Ritorna solo JSON.`;
 
@@ -81,9 +83,13 @@ export const analyzeReceipt = async (base64Image: string) => {
             category: { 
               type: Type.STRING,
               enum: Object.values(Category)
+            },
+            paymentMethod: {
+              type: Type.STRING,
+              enum: Object.values(PaymentMethod)
             }
           },
-          required: ["description", "amount", "category"]
+          required: ["description", "amount", "category", "paymentMethod"]
         }
       }
     });

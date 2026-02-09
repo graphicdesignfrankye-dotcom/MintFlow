@@ -8,17 +8,34 @@ const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Helper per ottenere l'URL di redirect corretto in base all'ambiente
+const getRedirectUrl = () => {
+  return window.location.origin;
+};
+
 export const auth = {
   async signUp(email: string, password: string, username: string) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { display_name: username }
+        data: { display_name: username },
+        emailRedirectTo: getRedirectUrl(),
       }
     });
     if (error) throw error;
     return data;
+  },
+
+  async resendConfirmation(email: string) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: getRedirectUrl(),
+      }
+    });
+    if (error) throw error;
   },
 
   async signIn(email: string, password: string) {
