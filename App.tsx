@@ -36,14 +36,14 @@ const App: React.FC = () => {
     ];
 
     const defaultCategories: CategoryConfig[] = [
-      { id: 'c1', name: 'Sigarette' },
-      { id: 'c2', name: 'Benzina' },
-      { id: 'c3', name: 'Autostrada' },
-      { id: 'c4', name: 'Ricarica Chiavetta' },
-      { id: 'c5', name: 'Svago' },
-      { id: 'c6', name: 'Salute' },
-      { id: 'c7', name: 'Abbonamenti', isSubscriptionDefault: true },
-      { id: 'c8', name: 'Altro' }
+      { id: 'c1', name: 'Sigarette', color: '#ef4444' }, // Rosso
+      { id: 'c2', name: 'Benzina', color: '#f97316' }, // Arancione
+      { id: 'c3', name: 'Autostrada', color: '#eab308' }, // Giallo scuro
+      { id: 'c4', name: 'Ricarica Chiavetta', color: '#84cc16' }, // Lime
+      { id: 'c5', name: 'Svago', color: '#06b6d4' }, // Ciano
+      { id: 'c6', name: 'Salute', color: '#ec4899' }, // Rosa
+      { id: 'c7', name: 'Abbonamenti', isSubscriptionDefault: true, color: '#8b5cf6' }, // Viola
+      { id: 'c8', name: 'Altro', color: '#64748b' } // Grigio
     ];
 
     const defaultSettings: UserSettings = {
@@ -62,6 +62,12 @@ const App: React.FC = () => {
       const parsed = JSON.parse(saved);
       if (!parsed.categories) {
         parsed.categories = defaultCategories;
+      } else {
+        // Migration: assegna colori se mancano
+        parsed.categories = parsed.categories.map((c: any, idx: number) => ({
+          ...c,
+          color: c.color || defaultCategories[idx % defaultCategories.length]?.color || '#10b981'
+        }));
       }
       if (!parsed.language) {
         parsed.language = 'it';
@@ -269,6 +275,7 @@ const App: React.FC = () => {
                 userName={userSettings.name} 
                 currency={userSettings.currency} 
                 wallets={userSettings.wallets}
+                categories={userSettings.categories}
                 lang={userSettings.language}
               />
             )}

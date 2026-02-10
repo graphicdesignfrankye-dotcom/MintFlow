@@ -1,8 +1,8 @@
 
 import React, { useMemo } from 'react';
-import { Expense, PaymentMethod, WalletConfig } from '../types';
+import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
-  PieChart, Pie, Cell, Tooltip 
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter } from 'date-fns';
@@ -15,10 +15,11 @@ interface DashboardProps {
   userName?: string;
   currency?: string;
   wallets: WalletConfig[];
+  categories: CategoryConfig[];
   lang?: 'it' | 'en';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€', wallets, lang = 'it' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€', wallets, categories, lang = 'it' }) => {
   const t = translations[lang].dashboard;
   const currentMonth = new Date();
   const currentMonthStart = startOfMonth(currentMonth);
@@ -91,7 +92,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
       .filter(item => item.value > 0);
   }, [currentMonthExpenses]);
 
-  const COLORS = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#059669', '#047857', '#065f46', '#064e3b'];
+  // Helper per ottenere il colore della categoria
+  const getCategoryColor = (catName: string) => {
+    return categories.find(c => c.name === catName)?.color || '#9ca3af'; // Grigio default
+  };
+
   const formatValue = (val: number) => `${currency}${val.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
   const isDark = document.documentElement.classList.contains('dark');
   const dateLocale = lang === 'en' ? enUS : it;
@@ -180,17 +185,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
           <h3 className="text-lg font-bold dark:text-white mb-6 self-start">{t.expenseDistribution}</h3>
           <div className="w-full flex justify-center py-4" style={{ height: '300px' }}>
             {categoryData.length > 0 ? (
-              <PieChart width={280} height={280}>
-                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '12px', border: 'none', 
-                    backgroundColor: isDark ? '#1f2937' : '#ffffff', color: isDark ? '#ffffff' : '#000000'
-                  }} 
-                />
-              </PieChart>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} strokeWidth={2} stroke={isDark ? '#1f2937' : '#fff'} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '12px', border: 'none', 
+                      backgroundColor: isDark ? '#1f2937' : '#ffffff', color: isDark ? '#ffffff' : '#000000',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }} 
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             ) : <div className="h-full flex items-center text-gray-400">{t.noData}</div>}
           </div>
         </div>
@@ -202,7 +212,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
               categoryData.sort((a,b) => b.value - a.value).slice(0, 5).map((entry, index) => (
                 <div key={entry.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                    <div className="w-3 h-3 rounded-full border border-gray-100 dark:border-gray-600 shadow-sm" style={{ backgroundColor: getCategoryColor(entry.name) }}></div>
                     <span className="text-sm dark:text-gray-300">{entry.name}</span>
                   </div>
                   <span className="text-sm font-bold dark:text-white">{formatValue(entry.value)}</span>

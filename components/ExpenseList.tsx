@@ -1,8 +1,11 @@
 
 import React, { useState } from 'react';
 import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
-import { Trash2, Search, Filter, CreditCard, Banknote, Fuel, Edit2, Building, AlertCircle } from 'lucide-react';
-import { format, isFuture, startOfMonth } from 'date-fns';
+import { 
+  Trash2, Search, Filter, Edit2, AlertCircle, 
+  Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils
+} from 'lucide-react';
+import { format, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface ExpenseListProps {
@@ -25,6 +28,23 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Funzione per ottenere l'icona in base alla categoria
+  const getCategoryIcon = (categoryName: string) => {
+    const lower = categoryName.toLowerCase();
+    
+    if (lower.includes('sigarett') || lower.includes('tabacco') || lower.includes('iqos')) return <Cigarette size={20} />;
+    if (lower.includes('benzina') || lower.includes('diesel') || lower.includes('carburante')) return <Fuel size={20} />;
+    if (lower.includes('autostrada') || lower.includes('auto') || lower.includes('parcheggio') || lower.includes('telepass')) return <Car size={20} />;
+    if (lower.includes('ricarica') || lower.includes('luce') || lower.includes('energia')) return <Zap size={20} />;
+    if (lower.includes('svago') || lower.includes('cinema') || lower.includes('gioc') || lower.includes('bar')) return <Gamepad2 size={20} />;
+    if (lower.includes('salute') || lower.includes('farmacia') || lower.includes('medic') || lower.includes('dott')) return <Heart size={20} />;
+    if (lower.includes('abbonament') || lower.includes('netflix') || lower.includes('spotify') || lower.includes('sub')) return <Repeat size={20} />;
+    if (lower.includes('cibo') || lower.includes('ristorant') || lower.includes('pranzo') || lower.includes('cena') || lower.includes('spesa')) return <Utensils size={20} />;
+    
+    // Default per 'Altro' o categorie non riconosciute
+    return <ShoppingBag size={20} />;
+  };
 
   return (
     <div className="space-y-4">
@@ -66,25 +86,32 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                   key={expense.id} 
                   className={`p-4 flex items-center justify-between hover:bg-emerald-50/30 dark:hover:bg-gray-700/30 transition-colors ${isDateInFuture ? 'bg-red-50/20' : ''}`}
                 >
-                  <div className="flex items-center gap-3 md:gap-4 overflow-hidden flex-1">
-                    <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center font-bold ${isDateInFuture ? 'bg-red-100 text-red-600' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'}`}>
-                      {isDateInFuture ? <AlertCircle size={20} /> : expense.category.charAt(0)}
+                  <div className="flex items-center gap-3 md:gap-4 overflow-hidden flex-1 min-w-0">
+                    {/* Icona Categoria */}
+                    <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center font-bold transition-colors ${
+                      isDateInFuture 
+                        ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
+                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    }`}>
+                      {getCategoryIcon(expense.category)}
                     </div>
                     
-                    <div className="overflow-hidden">
-                      <h4 className="font-semibold text-gray-800 dark:text-white truncate text-sm md:text-base">
+                    <div className="overflow-hidden min-w-0 flex-1">
+                      <h4 className="font-semibold text-gray-800 dark:text-white truncate text-sm md:text-base pr-2">
                         {expense.description}
                       </h4>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-medium text-gray-400">
-                        <span>{format(expenseDate, 'dd MMM yyyy', { locale: it })}</span>
+                        {/* Se futura, mostriamo anche un piccolo warning testuale o icona accanto alla data */}
+                        {isDateInFuture && <AlertCircle size={10} className="text-red-500" />}
+                        <span className={`whitespace-nowrap ${isDateInFuture ? "text-red-500" : ""}`}>{format(expenseDate, 'dd MMM yyyy', { locale: it })}</span>
                         <span>•</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">{expense.category}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 truncate">{expense.category}</span>
                       </div>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <span className="font-bold text-gray-800 dark:text-white text-base md:text-lg">
+                    <span className={`font-bold text-base md:text-lg whitespace-nowrap ${isDateInFuture ? 'text-red-500' : 'text-gray-800 dark:text-white'}`}>
                       {currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                     </span>
                     
@@ -92,10 +119,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                       <button 
                         type="button"
                         onClick={() => onEdit(expense)} 
-                        className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-emerald-500 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-all"
+                        className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-gray-400 hover:text-emerald-500 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-all"
                         title="Modifica"
                       >
-                        <Edit2 size={16} />
+                        <Edit2 size={14} className="md:w-4 md:h-4" />
                       </button>
                       <button 
                         type="button"
@@ -103,10 +130,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                           e.stopPropagation();
                           onDelete(expense.id);
                         }} 
-                        className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-all active:scale-90"
+                        className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-all active:scale-90"
                         title="Elimina"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
                       </button>
                     </div>
                   </div>

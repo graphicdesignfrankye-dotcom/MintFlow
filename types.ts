@@ -14,6 +14,7 @@ export interface CategoryConfig {
   id: string;
   name: string;
   isSubscriptionDefault?: boolean;
+  color?: string;
 }
 
 export interface Expense {

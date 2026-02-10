@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
 import { UserSettings, Expense, WalletConfig, CategoryConfig, PaymentMethod } from '../types';
-import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save } from 'lucide-react';
+import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check } from 'lucide-react';
 import { auth } from '../services/supabase';
 import { format } from 'date-fns';
 import { HistoryView } from './HistoryView';
 import { translations } from '../utils/i18n';
 
 const SettingsRow = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="w-full flex items-center justify-between px-8 py-6 hover:bg-emerald-50 dark:hover:bg-gray-700/50 transition-all group">
-    <div className="flex items-center gap-4">{icon}<span className="font-bold text-gray-700 dark:text-gray-200">{label}</span></div>
+  <button type="button" onClick={onClick} className="w-full flex items-center justify-between px-6 py-5 md:px-8 md:py-6 hover:bg-emerald-50 dark:hover:bg-gray-700/50 transition-all group">
+    <div className="flex items-center gap-4">{icon}<span className="font-bold text-gray-700 dark:text-gray-200 text-sm md:text-base">{label}</span></div>
     <ChevronRight className="text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" size={20} />
   </button>
 );
@@ -18,7 +18,7 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-md z-[110] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{title}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
@@ -49,8 +49,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   
+  // States for adding new items
   const [isAdding, setIsAdding] = useState(false);
   const [newItemName, setNewItemName] = useState('');
+  const [newItemColor, setNewItemColor] = useState('#10b981');
+
+  // States for editing existing items
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('');
 
   const [tempName, setTempName] = useState(settings.name);
   const [tempEmail, setTempEmail] = useState(email || '');
@@ -129,7 +136,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     } else {
       const newCat: CategoryConfig = {
         id: 'c' + Date.now(),
-        name: newItemName.trim()
+        name: newItemName.trim(),
+        color: newItemColor
       };
       onUpdate({ ...settings, categories: [...settings.categories, newCat] });
     }
@@ -139,13 +147,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     showFeedback("Aggiunto con successo!");
   };
 
+  const startEditing = (item: CategoryConfig) => {
+    setEditingId(item.id);
+    setEditName(item.name);
+    setEditColor(item.color || '#10b981');
+  };
+
+  const saveEdit = () => {
+    if (!editName.trim()) return;
+    const newCats = settings.categories.map(c => 
+      c.id === editingId ? { ...c, name: editName, color: editColor } : c
+    );
+    onUpdate({ ...settings, categories: newCats });
+    setEditingId(null);
+    showFeedback("Modifica salvata!");
+  };
+
   if (view === 'history') return <HistoryView expenses={expenses} onClose={() => setView('main')} currency={settings.currency} />;
   
   if (view === 'wallets') return (
-    <div className="animate-in slide-in-from-right duration-300 min-h-screen bg-white dark:bg-gray-900 -mt-8 -mx-4 px-4 pt-8">
-      <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
+      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
-        <h2 className="text-3xl font-bold dark:text-white">{t.manageWallets}</h2>
+        <h2 className="text-3xl font-bold dark:text-white mb-6">{t.manageWallets}</h2>
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
           {settings.wallets.map(w => (
             <div key={w.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative">
@@ -186,38 +210,87 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   );
 
   if (view === 'categories') return (
-    <div className="animate-in slide-in-from-right duration-300 min-h-screen bg-white dark:bg-gray-900 -mt-8 -mx-4 px-4 pt-8">
-      <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
+      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
-        <h2 className="text-3xl font-bold dark:text-white">{t.manageCategories}</h2>
+        <h2 className="text-3xl font-bold dark:text-white mb-6">{t.manageCategories}</h2>
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
           {settings.categories.map(c => (
-            <div key={c.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative">
-              <div className="flex items-center gap-3 font-bold dark:text-white"><Tag className="text-emerald-500" /> {c.name}</div>
-              {!c.isSubscriptionDefault && (
-                <button 
-                  type="button"
-                  onClick={() => {
-                    onUpdate({ ...settings, categories: settings.categories.filter(x => x.id !== c.id) });
-                  }} 
-                  className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center relative z-30"
-                >
-                  <Trash2 size={18} className="pointer-events-none" />
-                </button>
+            <div key={c.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative group min-h-[72px]">
+              {editingId === c.id ? (
+                <div className="flex-1 flex items-center gap-3 animate-in fade-in duration-200 w-full overflow-hidden">
+                  <input 
+                    type="color" 
+                    value={editColor} 
+                    onChange={(e) => setEditColor(e.target.value)}
+                    className="w-10 h-10 border-none bg-transparent cursor-pointer rounded-full shrink-0"
+                  />
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={editName} 
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 bg-white dark:bg-gray-600 rounded-xl border-none outline-none dark:text-white font-bold"
+                  />
+                  <div className="flex gap-1 ml-2 shrink-0">
+                    <button onClick={saveEdit} className="p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600"><Check size={18} /></button>
+                    <button onClick={() => setEditingId(null)} className="p-2 bg-gray-200 dark:bg-gray-600 text-gray-500 rounded-full hover:bg-gray-300"><X size={18} /></button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 font-bold dark:text-white">
+                    <div 
+                      className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm"
+                      style={{ backgroundColor: c.color || '#10b981' }}
+                    ></div>
+                    <span>{c.name}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => startEditing(c)} 
+                      className="p-2.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-all flex items-center justify-center"
+                    >
+                      <Edit3 size={18} />
+                    </button>
+
+                    {!c.isSubscriptionDefault && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          onUpdate({ ...settings, categories: settings.categories.filter(x => x.id !== c.id) });
+                        }} 
+                        className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           ))}
 
           {isAdding ? (
             <div className="space-y-3 p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border-2 border-emerald-500 animate-in zoom-in-95 duration-200">
-              <input 
-                autoFocus
-                type="text" 
-                value={newItemName} 
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder="Nome categoria..."
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-700 border-none outline-none dark:text-white font-bold"
-              />
+              <div className="flex items-center gap-3 bg-white dark:bg-gray-700 rounded-xl px-2">
+                <input 
+                  type="color" 
+                  value={newItemColor} 
+                  onChange={(e) => setNewItemColor(e.target.value)}
+                  className="w-10 h-10 border-none bg-transparent cursor-pointer rounded-full shrink-0"
+                />
+                <input 
+                  autoFocus
+                  type="text" 
+                  value={newItemName} 
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="Nome categoria..."
+                  className="flex-1 px-2 py-3 bg-transparent border-none outline-none dark:text-white font-bold min-w-0"
+                />
+              </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => handleAddItem('category')} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-bold text-sm">Salva</button>
                 <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-3 bg-white dark:bg-gray-600 text-gray-400 rounded-xl font-bold text-sm">Annulla</button>
@@ -240,33 +313,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="bg-emerald-500 p-4 rounded-3xl text-white">
-              <User size={32} />
+      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
+          <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+            <div className="bg-emerald-500 p-3 md:p-4 rounded-3xl text-white shrink-0">
+              <User className="w-6 h-6 md:w-8 md:h-8" />
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white">{t.profile}</h3>
-              <p className="text-gray-400 text-sm">{email}</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg md:text-xl font-bold text-gray-800 dark:text-white truncate">{t.profile}</h3>
+              <p className="text-gray-400 text-xs md:text-sm truncate">{email}</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all">
+          <div className="flex gap-2 shrink-0 self-start sm:self-auto ml-12 sm:ml-0">
+            <button type="button" onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-[10px] md:text-xs hover:bg-emerald-100 transition-all whitespace-nowrap">
               <Edit3 size={14} /> {t.edit}
             </button>
             <button 
               type="button" 
               onClick={() => onUpdate({ ...settings, language: lang === 'it' ? 'en' : 'it' })} 
-              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-xs hover:bg-blue-100 transition-all"
+              className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-[10px] md:text-xs hover:bg-blue-100 transition-all whitespace-nowrap"
             >
               <Globe size={14} /> {lang === 'it' ? 'ITA' : 'ENG'}
             </button>
           </div>
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">{t.displayName}</label>
-          <div className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 dark:text-white font-bold text-lg">{settings.name}</div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 md:mb-3 ml-1">{t.displayName}</label>
+          <div className="w-full px-5 py-3 md:px-6 md:py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 dark:text-white font-bold text-base md:text-lg truncate">{settings.name}</div>
         </div>
       </div>
 
