@@ -1,15 +1,16 @@
 
 import React, { useEffect, useState } from 'react';
-import { Category } from '../types';
+import { CategoryConfig } from '../types';
 import { Sparkles } from 'lucide-react';
 
 interface SmartCategorizerProps {
   description: string;
-  onSuggest: (category: Category) => void;
+  onSuggest: (category: string) => void;
+  categories: CategoryConfig[];
 }
 
-export const SmartCategorizer: React.FC<SmartCategorizerProps> = ({ description, onSuggest }) => {
-  const [suggestion, setSuggestion] = useState<Category | null>(null);
+export const SmartCategorizer: React.FC<SmartCategorizerProps> = ({ description, onSuggest, categories }) => {
+  const [suggestion, setSuggestion] = useState<string | null>(null);
 
   useEffect(() => {
     if (description.length < 3) {
@@ -18,31 +19,26 @@ export const SmartCategorizer: React.FC<SmartCategorizerProps> = ({ description,
     }
 
     const d = description.toLowerCase();
-    let suggested: Category | null = null;
+    let suggested: string | null = null;
 
-    if (d.includes('sigarette') || d.includes('tabacco') || d.includes('iqos') || d.includes('heets') || d.includes('cartine')) {
-      suggested = Category.Sigarette;
-    } else if (d.includes('benzina') || d.includes('diesel') || d.includes('carburante') || d.includes('eni') || d.includes('q8') || d.includes('distributore')) {
-      suggested = Category.Benzina;
-    } else if (d.includes('autostrada') || d.includes('telepass') || d.includes('pedaggio') || d.includes('casello') || d.includes('a1') || d.includes('a4')) {
-      suggested = Category.Autostrada;
-    } else if (d.includes('ricarica') || d.includes('chiavetta') || d.includes('caffè') || d.includes('vending') || d.includes('macchinetta')) {
-      suggested = Category.RicaricaChiavetta;
-    } else if (d.includes('cinema') || d.includes('bar') || d.includes('aperitivo') || d.includes('pizza') || d.includes('netflix') || d.includes('cena')) {
-      suggested = Category.Svago;
-    } else if (d.includes('farmacia') || d.includes('dentista') || d.includes('visita') || d.includes('medico') || d.includes('ospedale')) {
-      suggested = Category.Salute;
-    }
+    // Mapping logico basato su parole chiave e nomi delle categorie dell'utente
+    const findCat = (keywords: string[]) => categories.find(c => keywords.some(k => c.name.toLowerCase().includes(k) || d.includes(k)));
 
+    if (d.includes('sigarette') || d.includes('heets') || d.includes('tabacco')) suggested = findCat(['sigarette'])?.name || null;
+    else if (d.includes('benzina') || d.includes('eni') || d.includes('q8')) suggested = findCat(['benzina'])?.name || null;
+    else if (d.includes('autostrada') || d.includes('casello')) suggested = findCat(['autostrada'])?.name || null;
+    else if (d.includes('netflix') || d.includes('spotify') || d.includes('prime')) suggested = categories.find(c => c.isSubscriptionDefault || c.name.toLowerCase().includes('abbon'))?.name || null;
+    else if (d.includes('pizza') || d.includes('bar') || d.includes('ristorante')) suggested = findCat(['svago', 'divertimento'])?.name || null;
+    
     setSuggestion(suggested);
-  }, [description]);
+  }, [description, categories]);
 
   if (!suggestion) return null;
 
   return (
     <div 
       onClick={() => onSuggest(suggestion)}
-      className="mt-2 flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors border border-emerald-100 dark:border-emerald-800 animate-in slide-in-from-top-1"
+      className="mt-2 flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-emerald-100 border border-emerald-100 animate-in slide-in-from-top-1"
     >
       <Sparkles size={12} />
       <span>Suggerimento AI: <strong>{suggestion}</strong>. Clicca per impostare.</span>

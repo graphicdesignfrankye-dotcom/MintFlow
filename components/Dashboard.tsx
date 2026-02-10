@@ -1,11 +1,11 @@
 
 import React, { useMemo } from 'react';
-import { Expense, Category, PaymentMethod, WalletConfig } from '../types';
+import { Expense, PaymentMethod, WalletConfig } from '../types';
 import { 
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip 
+  PieChart, Pie, Cell, Tooltip 
 } from 'recharts';
-import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Info } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths } from 'date-fns';
+import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface DashboardProps {
@@ -26,6 +26,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
       isWithinInterval(new Date(e.date), { start: currentMonthStart, end: currentMonthEnd })
     );
   }, [expenses]);
+
+  const futureExpenses = useMemo(() => {
+    return expenses.filter(e => isAfter(new Date(e.date), currentMonthEnd));
+  }, [expenses, currentMonthEnd]);
 
   const budgetExpenses = useMemo(() => {
     return currentMonthExpenses.filter(e => 
@@ -57,25 +61,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
         .filter(e => e.paymentMethod === w.method && !e.description.toLowerCase().includes('ricarica'))
         .reduce((sum, e) => sum + e.amount, 0);
       
-      const colorMap = {
-        zap: 'text-emerald-500',
-        wallet: 'text-blue-500',
-        fuel: 'text-orange-500',
-        'credit-card': 'text-purple-500'
-      };
-
-      const iconMap = {
-        zap: <Zap size={14} />,
-        wallet: <Wallet size={14} />,
-        fuel: <Fuel size={14} />,
-        'credit-card': <CreditCard size={14} />
-      };
-
       return {
-        name: w.name,
+        ...w,
         value: Math.max(0, totalRecharged - totalSpent),
-        icon: iconMap[w.icon] || <Wallet size={14} />,
-        color: colorMap[w.icon] || 'text-emerald-500'
+        icon: w.icon === 'zap' ? <Zap size={14} /> : w.icon === 'fuel' ? <Fuel size={14} /> : <CreditCard size={14} />,
+        color: w.icon === 'zap' ? 'text-emerald-500' : 'text-blue-500'
       };
     });
   }, [expenses, wallets]);
@@ -85,7 +75,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
     currentMonthExpenses.forEach(e => {
       data[e.category] = (data[e.category] || 0) + e.amount;
     });
-    return Object.entries(data).map(([name, value]) => ({ name, value }));
+    return Object.entries(data)
+      .map(([name, value]) => ({ name, value }))
+      .filter(item => item.value > 0);
   }, [currentMonthExpenses]);
 
   const COLORS = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#059669', '#047857', '#065f46', '#064e3b'];
@@ -96,124 +88,118 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="mb-2">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Ciao, {userName}! 👋</h2>
-        <p className="text-gray-500 dark:text-gray-400">Ecco lo stato delle tue finanze per questo mese.</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Ecco lo stato delle finanze di questo mese</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2 bg-emerald-500 dark:bg-emerald-600 p-8 rounded-[2rem] text-white shadow-xl shadow-emerald-200/50 dark:shadow-none relative overflow-hidden">
-          <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
-          
           <div className="flex justify-between items-start mb-6">
             <div>
-              <p className="text-emerald-50 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                Budget Mensile 
-                <span className="bg-white/20 px-2 py-0.5 rounded text-[9px] lowercase font-medium">Contanti & Bancomat</span>
-              </p>
-              <h2 className="text-4xl font-black mt-1">{formatValue(totalCurrentMonth)}</h2>
+              <p className="text-emerald-50 text-xs font-bold uppercase tracking-wider mb-1">Speso questo mese</p>
+              <h2 className="text-4xl font-black">{formatValue(totalCurrentMonth)}</h2>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
               <CreditCard size={24} />
             </div>
           </div>
-
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-emerald-50">
               <span>Target: {currency}{budget.toLocaleString('it-IT')}</span>
-              <span>{Math.round(budgetProgress)}% utilizzato</span>
+              <span>{Math.round(budgetProgress)}%</span>
             </div>
             <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden">
-              <div 
-                className={`h-full transition-all duration-1000 ${totalCurrentMonth > budget ? 'bg-red-300' : 'bg-white'}`}
-                style={{ width: `${budgetProgress}%` }}
-              ></div>
+              <div className="h-full bg-white transition-all duration-1000" style={{ width: `${budgetProgress}%` }}></div>
             </div>
-            <p className="text-[10px] text-emerald-100/70 italic mt-2">Le ricariche e le spese con portafogli non intaccano questo budget primario.</p>
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm transition-colors">
-            <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl">
-              <Target size={20} />
-            </div>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
+            <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl"><Target size={20} /></div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs">Rispetto a Mese Scorso</p>
-              <p className={`font-bold ${diff <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                {diff <= 0 ? '-' : '+'}{Math.abs(diff).toFixed(1)}%
-              </p>
+              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold">Rispetto a Mese Scorso</p>
+              <p className={`font-bold ${diff <= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{diff <= 0 ? '-' : '+'}{Math.abs(diff).toFixed(1)}%</p>
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm transition-colors">
-            <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl">
-              <Calendar size={20} />
-            </div>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
+            <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl"><Calendar size={20} /></div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs">Periodo</p>
-              <p className="font-bold text-gray-800 dark:text-white capitalize">{format(currentMonth, "MMMM yyyy", { locale: it })}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold">Mese</p>
+              <p className="font-bold dark:text-white capitalize">{format(currentMonth, "MMMM yyyy", { locale: it })}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors overflow-x-auto">
-        <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-6 px-2 flex items-center gap-2">
-          <Wallet size={16} className="text-emerald-500" />
-          I tuoi Saldi Portafoglio
-        </h3>
-        <div className="flex flex-nowrap gap-4 pb-2">
+      {futureExpenses.length > 0 && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-[2rem] border border-emerald-200 dark:border-emerald-800 flex items-center justify-between group cursor-default">
+          <div className="flex items-center gap-4">
+            <div className="bg-emerald-500 p-3 rounded-2xl text-white">
+              <Clock size={20} />
+            </div>
+            <div>
+              <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">Spese Programmate</p>
+              <p className="text-[10px] text-emerald-500/70 dark:text-emerald-500/50 font-bold uppercase tracking-wider">Hai {futureExpenses.length} {futureExpenses.length === 1 ? 'spesa' : 'spese'} nei prossimi mesi</p>
+            </div>
+          </div>
+          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+            {currency}{futureExpenses.reduce((s, e) => s + e.amount, 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      )}
+
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm overflow-x-auto">
+        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 ml-2">Saldi Wallet</h3>
+        <div className="flex gap-4 px-2">
           {balances.map((wallet) => (
-            <div key={wallet.name} className="flex-shrink-0 w-44 flex flex-col gap-1 p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/40 border border-transparent hover:border-emerald-100 dark:hover:border-emerald-900/30 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <div className={`p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm ${wallet.color}`}>
-                  {wallet.icon}
-                </div>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter truncate max-w-[80px]">{wallet.name}</span>
+            <div key={wallet.name} className="flex-shrink-0 w-40 p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/50">
+              <div className="flex justify-between items-center mb-2">
+                <div className={wallet.color}>{wallet.icon}</div>
+                <span className="text-[8px] font-bold text-gray-400 uppercase">{wallet.name}</span>
               </div>
-              <p className={`text-lg font-black ${wallet.value > 0 ? 'text-gray-800 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
-                {currency}{wallet.value.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-              </p>
+              <p className="font-bold dark:text-white">{currency}{wallet.value.toFixed(2)}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 px-2">Analisi Totale (Tutti i Metodi)</h3>
-          <div className="h-64">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm flex flex-col items-center">
+          <h3 className="text-lg font-bold dark:text-white mb-6 self-start">Distribuzione Spese</h3>
+          <div className="w-full flex justify-center py-4" style={{ height: '300px' }}>
             {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      backgroundColor: isDark ? '#1f2937' : '#ffffff', color: isDark ? '#ffffff' : '#000000'
-                    }} 
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">Nessuna spesa</div>
-            )}
+              <PieChart width={280} height={280}>
+                <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  {categoryData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '12px', border: 'none', 
+                    backgroundColor: isDark ? '#1f2937' : '#ffffff', color: isDark ? '#ffffff' : '#000000'
+                  }} 
+                />
+              </PieChart>
+            ) : <div className="h-full flex items-center text-gray-400">Nessun dato questo mese</div>}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
-           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 px-2">Top Categorie</h3>
-           <div className="space-y-3">
-             {categoryData.sort((a,b) => b.value - a.value).slice(0, 5).map((entry, index) => (
-               <div key={entry.name} className="flex items-center justify-between p-3 rounded-xl hover:bg-emerald-50 dark:hover:bg-gray-700 transition-colors">
-                 <div className="flex items-center gap-3">
-                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{entry.name}</span>
-                 </div>
-                 <span className="text-sm font-bold text-gray-900 dark:text-white">{formatValue(entry.value)}</span>
-               </div>
-             ))}
-           </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
+          <h3 className="text-lg font-bold dark:text-white mb-6">Top Categorie</h3>
+          <div className="space-y-4">
+            {categoryData.length > 0 ? (
+              categoryData.sort((a,b) => b.value - a.value).slice(0, 5).map((entry, index) => (
+                <div key={entry.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                    <span className="text-sm dark:text-gray-300">{entry.name}</span>
+                  </div>
+                  <span className="text-sm font-bold dark:text-white">{formatValue(entry.value)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 text-gray-400 text-sm">Nessuna spesa registrata a {format(currentMonth, 'MMMM', { locale: it })}</div>
+            )}
+          </div>
         </div>
       </div>
     </div>

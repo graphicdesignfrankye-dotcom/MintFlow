@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Expense, Category, PaymentMethod } from "../types";
+// Fixed: Removed non-existent Category member from types import
+import { Expense, PaymentMethod } from "../types";
 
 // Initialize Gemini with API key from environment variable
 const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -86,8 +87,8 @@ export const analyzeReceipt = async (base64Image: string) => {
             description: { type: Type.STRING },
             amount: { type: Type.NUMBER },
             category: { 
-              type: Type.STRING,
-              enum: Object.values(Category)
+              // Fixed: categories are now dynamic, so we just use string type here
+              type: Type.STRING
             },
             paymentMethod: {
               type: Type.STRING,

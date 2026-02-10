@@ -2,10 +2,11 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Camera, X, Loader2, Sparkles, Check } from 'lucide-react';
 import { analyzeReceipt } from '../services/gemini';
-import { Category } from '../types';
+// Fixed: Removed non-existent Category import from types
 
 interface ReceiptScannerProps {
-  onDetected: (data: { description: string; amount: number; category: Category }) => void;
+  // Fixed: changed category type to string
+  onDetected: (data: { description: string; amount: number; category: string }) => void;
   onClose: () => void;
 }
 

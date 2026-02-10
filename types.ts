@@ -1,15 +1,4 @@
 
-export enum Category {
-  Sigarette = 'Sigarette',
-  Benzina = 'Benzina',
-  Autostrada = 'Autostrada',
-  RicaricaChiavetta = 'Ricarica Chiavetta',
-  Svago = 'Svago',
-  Salute = 'Salute',
-  Abbonamenti = 'Abbonamenti',
-  Altro = 'Altro'
-}
-
 export enum PaymentMethod {
   Contanti = 'Contanti',
   Flash = 'Prepagata Flash',
@@ -21,12 +10,17 @@ export enum PaymentMethod {
   Wallet6 = 'Wallet Extra 3'
 }
 
-// Added Expense interface to fix the "Module has no exported member 'Expense'" errors in multiple files
+export interface CategoryConfig {
+  id: string;
+  name: string;
+  isSubscriptionDefault?: boolean;
+}
+
 export interface Expense {
   id: string;
   description: string;
   amount: number;
-  category: Category;
+  category: string; // Ora è una stringa dinamica
   paymentMethod: PaymentMethod;
   date: string;
   isSubscription?: boolean;
@@ -45,6 +39,7 @@ export interface UserSettings {
   currency: string;
   isDarkMode: boolean;
   wallets: WalletConfig[];
+  categories: CategoryConfig[];
 }
 
 export interface AiInsight {

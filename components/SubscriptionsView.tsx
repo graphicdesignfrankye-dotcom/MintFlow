@@ -33,7 +33,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, 
         </div>
         <button 
           onClick={onAddSub}
-          className="w-full bg-white text-emerald-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all"
+          className="w-full bg-white text-emerald-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all active:scale-95"
         >
           <Plus size={20} /> Registra Nuovo Abbonamento
         </button>
@@ -46,7 +46,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, 
           <div className="grid grid-cols-1 gap-3">
             {subscriptions.map((sub) => (
               <div key={sub.id} className="bg-white dark:bg-gray-800 p-5 rounded-3xl border border-emerald-100 dark:border-gray-700 shadow-sm flex items-center justify-between group hover:border-emerald-300 transition-all">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500">
                     <Calendar size={24} />
                   </div>
@@ -56,20 +56,20 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, 
                       <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
                         <CreditCard size={10} /> {sub.paymentMethod}
                       </span>
-                      <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-tighter">Ricorrente</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
-                    <p className="font-black text-gray-800 dark:text-white text-lg">{currency}{sub.amount.toFixed(2)}</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase">Al mese</p>
+                    <p className="font-black text-gray-800 dark:text-white text-lg leading-none">{currency}{sub.amount.toFixed(2)}</p>
+                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">Al mese</p>
                   </div>
                   <button 
                     onClick={() => onDelete(sub.id)}
-                    className="p-2 text-gray-200 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                    className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all active:bg-red-100"
+                    title="Elimina abbonamento"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={20} />
                   </button>
                 </div>
               </div>
