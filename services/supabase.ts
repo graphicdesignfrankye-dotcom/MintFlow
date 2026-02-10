@@ -105,6 +105,8 @@ export const db = {
   },
 
   async addExpense(expense: Omit<Expense, 'id'>, userId: string): Promise<Expense> {
+    console.log("Tentativo salvataggio su Supabase:", expense);
+
     // Impacchettiamo descrizione, metodo e abbonamento in un'unica stringa
     const packedDesc = packDescription(
       expense.description, 
@@ -122,7 +124,13 @@ export const db = {
 
     // Inviamo solo le colonne che sappiamo esistere con certezza
     const { data, error } = await supabase.from('expenses').insert([insertData]).select().single();
-    if (error) throw error;
+    
+    if (error) {
+      console.error("Errore Supabase durante insert:", error);
+      throw error;
+    }
+    
+    console.log("Salvataggio riuscito:", data);
     
     return {
       id: data.id,

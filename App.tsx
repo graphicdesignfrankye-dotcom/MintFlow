@@ -101,30 +101,34 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      const loadData = async () => {
-        try {
-          setIsLoading(true);
-          const data = await db.getExpenses(session.user.id);
-          setExpenses(data);
-          const today = new Date();
-          const currentMonthKey = format(startOfMonth(today), 'yyyy-MM');
-          const lastArchivedMonth = localStorage.getItem('mintflow_last_archived');
-          if (today.getDate() === 1 && lastArchivedMonth !== currentMonthKey) {
-            setShowNewMonthToast(true);
-            localStorage.setItem('mintflow_last_archived', currentMonthKey);
-            setTimeout(() => setShowNewMonthToast(false), 8000);
-          }
-        } catch (err) {
-          console.error("Errore caricamento:", err);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      loadData();
+  const fetchExpenses = useCallback(async () => {
+    if (!session?.user?.id) return;
+    try {
+      setIsLoading(true);
+      const data = await db.getExpenses(session.user.id);
+      setExpenses(data);
+      
+      // Check new month
+      const today = new Date();
+      const currentMonthKey = format(startOfMonth(today), 'yyyy-MM');
+      const lastArchivedMonth = localStorage.getItem('mintflow_last_archived');
+      if (today.getDate() === 1 && lastArchivedMonth !== currentMonthKey) {
+        setShowNewMonthToast(true);
+        localStorage.setItem('mintflow_last_archived', currentMonthKey);
+        setTimeout(() => setShowNewMonthToast(false), 8000);
+      }
+    } catch (err) {
+      console.error("Errore caricamento:", err);
+    } finally {
+      setIsLoading(false);
     }
   }, [session]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchExpenses();
+    }
+  }, [session, fetchExpenses]);
 
   useEffect(() => {
     localStorage.setItem('mintflow_user_settings', JSON.stringify(userSettings));
@@ -170,70 +174,226 @@ const App: React.FC = () => {
     }
   };
 
-  const handleImportCSV = async (file: File) => {
+  const handleImportCSV = async (file: File): Promise<{ imported: number, skipped: number, errors: string[], debugInfo: string }> => {
+    if (!session?.user?.id) {
+      throw new Error("Utente non autenticato. Impossibile salvare su Supabase.");
+    }
+
     setIsSyncing(true);
+    let importedCount = 0;
+    let skippedCount = 0;
+    const errors: string[] = [];
+    let debugInfo = "";
+    
     try {
       const text = await file.text();
-      // Simple CSV parser (assuming standard headers or specific order, or simply iterating lines)
-      // Expecting standard format: date,description,amount,category,paymentMethod
+      // Rimuoviamo BOM se presente e dividiamo le righe
+      const cleanText = text.replace(/^\uFEFF/, ''); 
+      const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== '');
+
+      if (lines.length === 0) throw new Error("Il file è vuoto");
+
+      // --- 1. Rilevamento Separatore Migliorato ---
+      // Conta le occorrenze di ; e , nelle prime righe per decidere
+      const sample = lines.slice(0, 5).join('');
+      const semiCount = (sample.match(/;/g) || []).length;
+      const commaCount = (sample.match(/,/g) || []).length;
+      const separator = semiCount >= commaCount ? ';' : ',';
+
+      // --- 2. Rilevamento Colonne (Header Mapping) ---
+      const headers = lines[0].toLowerCase().split(separator).map(h => h.trim().replace(/^"|"$/g, ''));
       
-      const lines = text.split('\n');
-      const newExpenses: Expense[] = [];
-      let importedCount = 0;
+      let dateIdx = -1;
+      let descIdx = -1;
+      let amountIdx = -1;
+      let catIdx = -1;
+      let pmIdx = -1;
 
-      for (let i = 0; i < lines.length; i++) {
+      headers.forEach((h, i) => {
+        if (h.includes('date') || h.includes('data') || h.includes('giorno')) dateIdx = i;
+        else if (h.includes('desc') || h.includes('causale') || h.includes('testo') || h.includes('nome') || h.includes('oggett')) descIdx = i;
+        else if (h.includes('amount') || h.includes('importo') || h.includes('euro') || h.includes('valore') || h.includes('prezzo')) amountIdx = i;
+        else if (h.includes('cat')) catIdx = i;
+        else if (h.includes('metodo') || h.includes('pagamento') || h.includes('payment')) pmIdx = i;
+      });
+
+      debugInfo = `Separatore: '${separator}'. Colonne rilevate -> Data: ${dateIdx}, Desc: ${descIdx}, Importo: ${amountIdx}. Header: ${headers.join(' | ')}`;
+
+      // Se non abbiamo trovato header significativi, usiamo fallback posizionale (0, 1, 2)
+      if (dateIdx === -1) { dateIdx = 0; debugInfo += " (Fallback Data=0)"; }
+      if (descIdx === -1) { descIdx = 1; debugInfo += " (Fallback Desc=1)"; }
+      if (amountIdx === -1) { amountIdx = 2; debugInfo += " (Fallback Importo=2)"; }
+
+      // Helper per pulire valori
+      const cleanVal = (val: string) => val ? val.replace(/^"|"$/g, '').replace(/""/g, '"').trim() : '';
+
+      // Skip della prima riga SOLO se sembra un header
+      const firstVal = lines[0].split(separator)[amountIdx];
+      const hasHeader = (lines[0].toLowerCase().includes('data') || lines[0].toLowerCase().includes('date') || isNaN(parseFloat(firstVal?.replace(',', '.') || 'ABC')));
+      const startIdx = hasHeader ? 1 : 0;
+
+      for (let i = startIdx; i < lines.length; i++) {
         const line = lines[i].trim();
-        // Skip empty lines or potential headers (if line contains "date" and "amount")
-        if (!line || (i === 0 && line.toLowerCase().includes('date') && line.toLowerCase().includes('amount'))) continue;
+        if (!line) continue;
         
-        // Simple comma split - Warning: this breaks if description has commas
-        // For a robust app, use a CSV library. For this snippet, we assume simple CSV.
-        const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Regex to split by comma ignoring quotes
-        
-        if (parts.length >= 3) {
-           const date = parts[0]?.replace(/"/g, '').trim();
-           const description = parts[1]?.replace(/"/g, '').trim();
-           const amount = parseFloat(parts[2]?.replace(/"/g, '').trim());
-           const category = parts[3]?.replace(/"/g, '').trim() || 'Altro';
-           const paymentMethodStr = parts[4]?.replace(/"/g, '').trim();
-           
-           // Validate minimum requirements
-           if (date && description && !isNaN(amount)) {
-             // Map string to PaymentMethod enum if possible, else default
-             let pm = PaymentMethod.Contanti;
-             if (Object.values(PaymentMethod).includes(paymentMethodStr as PaymentMethod)) {
-               pm = paymentMethodStr as PaymentMethod;
-             }
+        try {
+          // Split manuale per gestire virgolette
+          const parts: string[] = [];
+          let current = '';
+          let inQuote = false;
+          for (let char of line) {
+            if (char === '"') { inQuote = !inQuote; } 
+            else if (char === separator && !inQuote) { parts.push(current); current = ''; } 
+            else { current += char; }
+          }
+          parts.push(current);
 
-             const expenseData = {
-               date,
-               description,
-               amount,
-               category,
-               paymentMethod: pm,
-               isSubscription: false // Default to false for imports
-             };
-             
-             // Add to DB
-             const saved = await db.addExpense(expenseData, session.user.id);
-             newExpenses.push(saved);
-             importedCount++;
-           }
+          const rawDate = cleanVal(parts[dateIdx]);
+          const rawDesc = cleanVal(parts[descIdx]);
+          const rawAmount = cleanVal(parts[amountIdx]);
+          const rawCat = catIdx > -1 ? cleanVal(parts[catIdx]) : '';
+          const rawPm = pmIdx > -1 ? cleanVal(parts[pmIdx]) : '';
+
+          if (!rawDate && !rawAmount) {
+             errors.push(`Riga ${i+1}: Saltata (Data e Importo vuoti).`);
+             continue;
+          }
+
+          // --- Parsing Data ---
+          let date = null;
+          if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              date = rawDate;
+          } else {
+              // Cerca pattern dd/mm/yyyy o dd.mm.yyyy
+              const dateParts = rawDate.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+              if (dateParts) {
+                  let [_, d, m, y] = dateParts;
+                  if (y.length === 2) y = "20" + y;
+                  date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+              }
+          }
+          
+          if (!date) {
+              errors.push(`Riga ${i+1}: Formato data non riconosciuto ("${rawDate}")`);
+              continue;
+          }
+
+          // --- Parsing Importo ---
+          let amountStr = rawAmount.replace(/[^0-9.,-]/g, '');
+          if (amountStr.endsWith('-')) amountStr = '-' + amountStr.slice(0, -1);
+          
+          if (amountStr.includes(',') && amountStr.includes('.')) {
+               if (amountStr.lastIndexOf(',') > amountStr.lastIndexOf('.')) {
+                   amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+               } else {
+                   amountStr = amountStr.replace(/,/g, '');
+               }
+          } else if (amountStr.includes(',')) {
+               amountStr = amountStr.replace(',', '.');
+          }
+
+          const amount = parseFloat(amountStr);
+          if (isNaN(amount)) {
+              errors.push(`Riga ${i+1}: Importo non valido ("${rawAmount}")`);
+              continue;
+          }
+
+          const description = rawDesc || "Spesa importata";
+          const category = rawCat || "Altro";
+          
+          // --- Controllo Duplicati ---
+          const isDuplicate = expenses.some(e => 
+             e.date === date && 
+             Math.abs(e.amount - amount) < 0.01 && 
+             e.description.toLowerCase().trim() === description.toLowerCase().trim()
+          );
+
+          if (isDuplicate) {
+             skippedCount++;
+             // Non lo contiamo come errore grave, ma lo logghiamo
+             // errors.push(`Riga ${i+1}: Duplicato rilevato e saltato.`);
+             continue;
+          }
+
+          // --- Metodo Pagamento ---
+          let pm = PaymentMethod.Contanti;
+          const normPm = rawPm.toLowerCase();
+          if (normPm.includes('flash')) pm = PaymentMethod.Flash;
+          else if (normPm.includes('revolut')) pm = PaymentMethod.Revolut;
+          else if (normPm.includes('q8')) pm = PaymentMethod.AppQ8;
+          else if (normPm.includes('bancomat') || normPm.includes('card') || normPm.includes('carta')) pm = PaymentMethod.Bancomat;
+
+          // --- SALVATAGGIO SU SUPABASE ---
+          // Eseguiamo qui l'addExpense. Se fallisce, il catch interno catturerà l'errore per questa riga.
+          await db.addExpense({
+             date,
+             description,
+             amount,
+             category,
+             paymentMethod: pm,
+             isSubscription: false
+          }, session.user.id);
+          
+          importedCount++;
+          
+        } catch (rowErr: any) {
+          console.error(`Errore importazione riga ${i+1}:`, rowErr);
+          errors.push(`Riga ${i+1}: Errore salvataggio DB - ${rowErr.message || 'Errore sconosciuto'}`);
         }
       }
 
+      // Ricarica dati
       if (importedCount > 0) {
-        setExpenses(prev => [...newExpenses, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        setSuccessToast(`${importedCount} spese importate!`);
+        await fetchExpenses();
+        setSuccessToast(`${importedCount} spese importate`);
         setTimeout(() => setSuccessToast(null), 4000);
-      } else {
-        alert("Nessuna spesa valida trovata nel file CSV.");
-      }
+      } 
+      
+      return { imported: importedCount, skipped: skippedCount, errors, debugInfo };
 
     } catch (err: any) {
-      alert("Errore durante l'importazione: " + err.message);
+      console.error(err);
+      throw new Error("Errore lettura file globale: " + err.message);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (expenses.length === 0) {
+      alert("Nessuna spesa da esportare.");
+      return;
+    }
+
+    try {
+      const headers = ["Date", "Description", "Amount", "Category", "PaymentMethod", "IsSubscription"];
+      const rows = expenses.map(e => {
+        const safeDesc = e.description.replace(/"/g, '""');
+        return [
+          e.date,
+          `"${safeDesc}"`,
+          e.amount.toFixed(2),
+          `"${e.category}"`,
+          e.paymentMethod,
+          e.isSubscription ? "true" : "false"
+        ].join(",");
+      });
+
+      const csvContent = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `mintflow_export_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setSuccessToast("Esportazione completata!");
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (err: any) {
+      console.error(err);
+      alert("Errore esportazione: " + err.message);
     }
   };
 
@@ -384,7 +544,7 @@ const App: React.FC = () => {
             )}
 
             {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-            {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={handleClearData} onImport={handleImportCSV} expenses={expenses} email={session.user.email} />}
+            {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={handleClearData} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session.user.email} />}
           </>
         )}
 

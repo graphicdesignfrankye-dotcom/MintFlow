@@ -89,7 +89,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
     });
     return Object.entries(data)
       .map(([name, value]) => ({ name, value }))
-      .filter(item => item.value > 0);
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value); // Ordinamento spostato qui per evitare mutazioni nel render
   }, [currentMonthExpenses]);
 
   // Helper per ottenere il colore della categoria
@@ -181,9 +182,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm flex flex-col items-center">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm flex flex-col">
           <h3 className="text-lg font-bold dark:text-white mb-6 self-start">{t.expenseDistribution}</h3>
-          <div className="w-full flex justify-center py-4" style={{ height: '300px' }}>
+          <div className="w-full h-[300px]">
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -201,7 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
                   />
                 </PieChart>
               </ResponsiveContainer>
-            ) : <div className="h-full flex items-center text-gray-400">{t.noData}</div>}
+            ) : <div className="h-full flex items-center justify-center text-gray-400">{t.noData}</div>}
           </div>
         </div>
 
@@ -209,7 +210,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
           <h3 className="text-lg font-bold dark:text-white mb-6">{t.topCategories}</h3>
           <div className="space-y-4">
             {categoryData.length > 0 ? (
-              categoryData.sort((a,b) => b.value - a.value).slice(0, 5).map((entry, index) => (
+              categoryData.slice(0, 5).map((entry, index) => (
                 <div key={entry.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full border border-gray-100 dark:border-gray-600 shadow-sm" style={{ backgroundColor: getCategoryColor(entry.name) }}></div>
