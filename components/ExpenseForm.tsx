@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { CategoryConfig, Expense, PaymentMethod, WalletConfig } from '../types';
 import { SmartCategorizer } from './SmartCategorizer';
-import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap } from 'lucide-react';
+import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap, Copy } from 'lucide-react';
 import { isSameMonth, isAfter, startOfMonth, parseISO, startOfToday } from 'date-fns';
 
 interface ExpenseFormProps {
@@ -12,6 +12,7 @@ interface ExpenseFormProps {
   currency?: string;
   wallets: WalletConfig[];
   categories: CategoryConfig[];
+  expenses?: Expense[];
 }
 
 export const ExpenseForm: React.FC<ExpenseFormProps> = ({ 
@@ -20,7 +21,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   initialData, 
   currency = '€', 
   wallets, 
-  categories 
+  categories,
+  expenses
 }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -31,7 +33,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Stato per il modale di conferma personalizzato
-  const [showConfirmModal, setShowConfirmModal] = useState<{show: boolean, type: 'future' | 'past' | null}>({
+  const [showConfirmModal, setShowConfirmModal] = useState<{show: boolean, type: 'future' | 'past' | 'duplicate' | null}>({
     show: false,
     type: null
   });
@@ -59,6 +61,21 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
     const selectedDate = parseISO(date);
     const today = startOfToday();
 
+    // Controllo Duplicati
+    if (expenses) {
+      const isDuplicate = expenses.some(e => 
+        e.id !== initialData?.id && // Ignora se stessi in caso di modifica
+        e.amount === parsedAmount && 
+        e.date === date && 
+        e.description.toLowerCase().trim() === description.toLowerCase().trim()
+      );
+
+      if (isDuplicate) {
+        setShowConfirmModal({ show: true, type: 'duplicate' });
+        return;
+      }
+    }
+
     // Controllo data futura: Qualsiasi data strettamente successiva ad oggi
     if (isAfter(selectedDate, today)) {
       setShowConfirmModal({ show: true, type: 'future' });
@@ -66,7 +83,6 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
     }
 
     // Controllo data passata (mesi precedenti)
-    // Se è nello stesso mese (anche passata), non entra qui e salva direttamente
     const startOfThisMonth = startOfMonth(today);
     if (!isSameMonth(selectedDate, today) && selectedDate < startOfThisMonth) {
       setShowConfirmModal({ show: true, type: 'past' });
@@ -184,14 +200,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-emerald-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl text-center animate-in zoom-in-95 duration-300 border-4 border-emerald-500">
             <div className="bg-emerald-100 dark:bg-emerald-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
-              <AlertTriangle size={32} />
+              {showConfirmModal.type === 'duplicate' ? <Copy size={32} /> : <AlertTriangle size={32} />}
             </div>
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
-              {showConfirmModal.type === 'future' ? 'Data Futura' : 'Data Passata'}
+              {showConfirmModal.type === 'future' ? 'Data Futura' : showConfirmModal.type === 'duplicate' ? 'Possibile Duplicato' : 'Data Passata'}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed font-medium">
               {showConfirmModal.type === 'future' 
-                ? 'Questa è una data futura, sei sicuro di voler aggiungere' 
+                ? 'Questa è una data futura, sei sicuro di voler aggiungere?' 
+                : showConfirmModal.type === 'duplicate'
+                ? 'Sembra che tu abbia già inserito una spesa identica in questa data. Vuoi procedere comunque?'
                 : 'Questa è una data passata, verrà aggiunta allo storico'}
             </p>
             <div className="flex flex-col gap-3">
@@ -201,7 +219,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                 className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-emerald-600 transition-colors"
               >
                 {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
-                {showConfirmModal.type === 'future' ? 'Si' : 'Va bene!'}
+                {showConfirmModal.type === 'future' ? 'Si' : showConfirmModal.type === 'duplicate' ? 'Salva comunque' : 'Va bene!'}
               </button>
               <button 
                 onClick={() => setShowConfirmModal({ show: false, type: null })}

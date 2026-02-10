@@ -319,7 +319,15 @@ const App: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative animate-in zoom-in-95 duration-200">
               <button type="button" onClick={() => { setShowForm(false); setPrefill(null); }} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 p-2">✕</button>
               <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">{prefill?.id ? 'Modifica' : 'Nuova Spesa'}</h2>
-              <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => { setShowForm(false); setPrefill(null); }} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
+              <ExpenseForm 
+                onSubmit={handleSaveExpense} 
+                onCancel={() => { setShowForm(false); setPrefill(null); }} 
+                initialData={prefill || undefined} 
+                currency={userSettings.currency} 
+                wallets={userSettings.wallets} 
+                categories={userSettings.categories} 
+                expenses={expenses}
+              />
             </div>
           </div>
         )}
