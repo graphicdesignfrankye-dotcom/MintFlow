@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings, Zap, Repeat } from 'lucide-react';
+import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat } from 'lucide-react';
 import { translations } from '../utils/i18n';
 
 interface LayoutProps {
@@ -20,7 +20,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
-              <CreditCard className="text-emerald-600 dark:text-emerald-400" size={24} />
+              <PiggyBank className="text-emerald-600 dark:text-emerald-400" size={24} />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
               MintFlow

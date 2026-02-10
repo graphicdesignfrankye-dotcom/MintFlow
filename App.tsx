@@ -11,7 +11,7 @@ import { RicaricheView } from './components/RicaricheView';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { Auth } from './components/Auth';
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig } from './types';
-import { Plus, ScanLine, Cloud, Loader2, CreditCard, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
 import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth } from 'date-fns';
 
@@ -203,7 +203,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4">
         <div className="bg-emerald-500 p-5 rounded-3xl text-white shadow-2xl animate-pulse">
-          <CreditCard size={48} />
+          <PiggyBank size={48} />
         </div>
         <div className="flex flex-col items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
           <Loader2 size={20} className="animate-spin" />

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth } from '../services/supabase';
-import { CreditCard, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle } from 'lucide-react';
+import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: () => void;
@@ -100,7 +100,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl p-8 border border-emerald-100 dark:border-gray-700 animate-in zoom-in-95 duration-300">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-emerald-500 p-4 rounded-2xl text-white mb-4 shadow-lg shadow-emerald-200">
-            <CreditCard size={32} />
+            <PiggyBank size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">MintFlow</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
