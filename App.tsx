@@ -170,6 +170,73 @@ const App: React.FC = () => {
     }
   };
 
+  const handleImportCSV = async (file: File) => {
+    setIsSyncing(true);
+    try {
+      const text = await file.text();
+      // Simple CSV parser (assuming standard headers or specific order, or simply iterating lines)
+      // Expecting standard format: date,description,amount,category,paymentMethod
+      
+      const lines = text.split('\n');
+      const newExpenses: Expense[] = [];
+      let importedCount = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        // Skip empty lines or potential headers (if line contains "date" and "amount")
+        if (!line || (i === 0 && line.toLowerCase().includes('date') && line.toLowerCase().includes('amount'))) continue;
+        
+        // Simple comma split - Warning: this breaks if description has commas
+        // For a robust app, use a CSV library. For this snippet, we assume simple CSV.
+        const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Regex to split by comma ignoring quotes
+        
+        if (parts.length >= 3) {
+           const date = parts[0]?.replace(/"/g, '').trim();
+           const description = parts[1]?.replace(/"/g, '').trim();
+           const amount = parseFloat(parts[2]?.replace(/"/g, '').trim());
+           const category = parts[3]?.replace(/"/g, '').trim() || 'Altro';
+           const paymentMethodStr = parts[4]?.replace(/"/g, '').trim();
+           
+           // Validate minimum requirements
+           if (date && description && !isNaN(amount)) {
+             // Map string to PaymentMethod enum if possible, else default
+             let pm = PaymentMethod.Contanti;
+             if (Object.values(PaymentMethod).includes(paymentMethodStr as PaymentMethod)) {
+               pm = paymentMethodStr as PaymentMethod;
+             }
+
+             const expenseData = {
+               date,
+               description,
+               amount,
+               category,
+               paymentMethod: pm,
+               isSubscription: false // Default to false for imports
+             };
+             
+             // Add to DB
+             const saved = await db.addExpense(expenseData, session.user.id);
+             newExpenses.push(saved);
+             importedCount++;
+           }
+        }
+      }
+
+      if (importedCount > 0) {
+        setExpenses(prev => [...newExpenses, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        setSuccessToast(`${importedCount} spese importate!`);
+        setTimeout(() => setSuccessToast(null), 4000);
+      } else {
+        alert("Nessuna spesa valida trovata nel file CSV.");
+      }
+
+    } catch (err: any) {
+      alert("Errore durante l'importazione: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const requestDeleteExpense = useCallback((id: string) => {
     setExpenseToDelete(id);
   }, []);
@@ -317,7 +384,7 @@ const App: React.FC = () => {
             )}
 
             {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-            {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={handleClearData} expenses={expenses} email={session.user.email} />}
+            {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={handleClearData} onImport={handleImportCSV} expenses={expenses} email={session.user.email} />}
           </>
         )}
 

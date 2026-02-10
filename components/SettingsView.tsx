@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { UserSettings, Expense, WalletConfig, CategoryConfig, PaymentMethod } from '../types';
-import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check } from 'lucide-react';
+import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check, Upload, Loader2 } from 'lucide-react';
 import { auth } from '../services/supabase';
 import { format } from 'date-fns';
 import { HistoryView } from './HistoryView';
@@ -33,6 +33,7 @@ interface SettingsViewProps {
   settings: UserSettings;
   onUpdate: (settings: UserSettings) => void;
   onClearData: () => void;
+  onImport?: (file: File) => Promise<void>;
   expenses: Expense[];
   email?: string;
 }
@@ -41,6 +42,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   settings, 
   onUpdate, 
   onClearData,
+  onImport,
   expenses,
   email
 }) => {
@@ -62,7 +64,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [tempName, setTempName] = useState(settings.name);
   const [tempEmail, setTempEmail] = useState(email || '');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const lang = settings.language || 'it';
   const t = translations[lang].settings;
@@ -161,6 +165,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onUpdate({ ...settings, categories: newCats });
     setEditingId(null);
     showFeedback("Modifica salvata!");
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onImport) return;
+    
+    if (!file.name.endsWith('.csv')) {
+      alert('Seleziona un file .csv valido');
+      return;
+    }
+
+    if (window.confirm('Vuoi importare le spese da questo file?')) {
+      setIsImporting(true);
+      try {
+        await onImport(file);
+        showFeedback("Importazione completata!");
+      } catch (err: any) {
+        alert("Errore importazione: " + err.message);
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    }
   };
 
   if (view === 'history') return <HistoryView expenses={expenses} onClose={() => setView('main')} currency={settings.currency} />;
@@ -376,9 +403,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><FileDown className="text-emerald-500" size={20} /> {t.dataArchive}</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <button type="button" onClick={() => setView('history')} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><History size={20} /> {t.history}</button>
-          <button type="button" onClick={() => alert("Funzione esportazione CSV pronta")} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><Download size={20} /> {t.export}</button>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <button type="button" onClick={() => setView('history')} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><History size={20} /> <span className="text-xs md:text-sm">{t.history}</span></button>
+          <button type="button" onClick={() => alert("Funzione esportazione CSV pronta")} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><Download size={20} /> <span className="text-xs md:text-sm">{t.export}</span></button>
+          
+          {/* Import CSV Button */}
+          <button 
+            type="button" 
+            onClick={() => fileInputRef.current?.click()} 
+            disabled={isImporting}
+            className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all relative overflow-hidden"
+          >
+            {isImporting ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />} 
+            <span className="text-xs md:text-sm">{t.import}</span>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".csv"
+              className="hidden" 
+            />
+          </button>
         </div>
       </div>
 
