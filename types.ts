@@ -40,6 +40,7 @@ export interface UserSettings {
   isDarkMode: boolean;
   wallets: WalletConfig[];
   categories: CategoryConfig[];
+  language: 'it' | 'en';
 }
 
 export interface AiInsight {

@@ -1,24 +1,37 @@
 
-import React, { useMemo } from 'react';
-import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2 } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface RicaricheViewProps {
   onRefill: (wallet: WalletConfig) => void;
+  onSaveExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
   expenses: Expense[];
   currency?: string;
   wallets: WalletConfig[];
 }
 
-export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses, currency = '€', wallets }) => {
+export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveExpense, expenses, currency = '€', wallets }) => {
+  const [editingWallet, setEditingWallet] = useState<WalletConfig | null>(null);
+  const [newBalance, setNewBalance] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const balances = useMemo(() => {
     return wallets.map(w => {
+      // Ricariche (entrate) + Aggiustamenti Positivi
       const totalRecharged = expenses
-        .filter(e => e.description.toLowerCase().includes(`ricarica ${w.name.toLowerCase()}`))
+        .filter(e => {
+          const desc = e.description.toLowerCase();
+          const name = w.name.toLowerCase();
+          // Include ricariche E aggiustamenti manuali che non sono uscite (quindi metodo diverso dal wallet)
+          const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`);
+          return isInflow && e.paymentMethod !== w.method;
+        })
         .reduce((sum, e) => sum + e.amount, 0);
       
+      // Spese (uscite)
       const totalSpent = expenses
         .filter(e => e.paymentMethod === w.method && !e.description.toLowerCase().includes('ricarica'))
         .reduce((sum, e) => sum + e.amount, 0);
@@ -36,8 +49,51 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
     ).slice(0, 10);
   }, [expenses]);
 
+  const handleEditClick = (wallet: WalletConfig) => {
+    const current = balances.find(b => b.id === wallet.id)?.balance || 0;
+    setNewBalance(current.toFixed(2));
+    setEditingWallet(wallet);
+  };
+
+  const handleBalanceUpdate = async () => {
+    if (!editingWallet) return;
+    const target = parseFloat(newBalance.replace(',', '.'));
+    if (isNaN(target) || target < 0) {
+      alert("Inserisci un importo valido");
+      return;
+    }
+
+    const current = balances.find(b => b.id === editingWallet.id)?.balance || 0;
+    const diff = target - current;
+
+    if (Math.abs(diff) < 0.01) {
+      setEditingWallet(null);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const isPositive = diff > 0;
+      await onSaveExpense({
+        description: `Aggiustamento ${editingWallet.name}`,
+        amount: Math.abs(diff),
+        category: 'Altro',
+        // Se positivo (entrata): metodo 'Contanti' (o altro, purché non sia il wallet stesso)
+        // Se negativo (uscita): metodo = wallet stesso (così conta come spesa)
+        paymentMethod: isPositive ? PaymentMethod.Contanti : editingWallet.method,
+        date: format(new Date(), 'yyyy-MM-dd'),
+        isSubscription: false
+      });
+      setEditingWallet(null);
+    } catch (err: any) {
+      alert("Errore aggiornamento: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">I tuoi Portafogli</h2>
@@ -56,6 +112,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
             balance={w.balance} 
             icon={w.icon === 'zap' ? <Zap size={20} /> : w.icon === 'fuel' ? <Fuel size={20} /> : w.icon === 'credit-card' ? <CreditCard size={20} /> : <Wallet size={20} />} 
             onRefill={() => onRefill(w)} 
+            onEdit={() => handleEditClick(w)}
             color={w.icon === 'zap' ? 'emerald' : w.icon === 'fuel' ? 'orange' : w.icon === 'credit-card' ? 'purple' : 'blue'} 
             currency={currency} 
           />
@@ -88,11 +145,54 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, expenses
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editingWallet && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold dark:text-white">Modifica Saldo</h3>
+              <button onClick={() => setEditingWallet(null)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+            
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl mb-6 flex items-center gap-3">
+              <div className="p-2 bg-white dark:bg-gray-700 rounded-xl text-emerald-500 shadow-sm">
+                {editingWallet.icon === 'zap' ? <Zap size={20} /> : editingWallet.icon === 'fuel' ? <Fuel size={20} /> : <CreditCard size={20} />}
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Portafoglio</p>
+                <p className="font-bold text-emerald-700 dark:text-emerald-400">{editingWallet.name}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nuovo Saldo</label>
+              <input 
+                autoFocus
+                type="number" 
+                inputMode="decimal"
+                value={newBalance} 
+                onChange={(e) => setNewBalance(e.target.value)} 
+                className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-black text-2xl" 
+              />
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Verrà creata una transazione di aggiustamento nascosta</p>
+            </div>
+
+            <button 
+              onClick={handleBalanceUpdate}
+              disabled={isSubmitting}
+              className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-emerald-600 transition-colors"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />} Salva Modifica
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-const WalletCard = ({ name, balance, icon, onRefill, color, currency }: any) => {
+const WalletCard = ({ name, balance, icon, onRefill, onEdit, color, currency }: any) => {
   const colorClasses = {
     emerald: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
     blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
@@ -100,15 +200,23 @@ const WalletCard = ({ name, balance, icon, onRefill, color, currency }: any) => 
     purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
   };
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-50 dark:border-gray-700 shadow-sm flex flex-col h-full">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-50 dark:border-gray-700 shadow-sm flex flex-col h-full relative group">
+      <button 
+        onClick={onEdit} 
+        className="absolute top-4 right-4 p-2 text-gray-300 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-gray-700 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+        title="Modifica saldo manualmente"
+      >
+        <Edit2 size={16} />
+      </button>
+
       <div className="flex justify-between items-start mb-4">
         <div className={`p-3 rounded-2xl ${colorClasses[color as keyof typeof colorClasses]}`}>{icon}</div>
-        <div className="text-right">
+        <div className="text-right pr-2">
           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[100px]">{name}</p>
           <p className="text-lg font-black text-gray-800 dark:text-white leading-none">{currency}{balance.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
         </div>
       </div>
-      <button onClick={onRefill} className="mt-auto w-full flex items-center justify-center gap-1.5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-[10px] font-bold transition-all shadow-md">
+      <button onClick={onRefill} className="mt-auto w-full flex items-center justify-center gap-1.5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-[10px] font-bold transition-all shadow-md active:scale-95">
         <Plus size={14} /> RICARICA
       </button>
     </div>

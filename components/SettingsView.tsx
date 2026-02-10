@@ -5,6 +5,7 @@ import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, Histor
 import { auth } from '../services/supabase';
 import { format } from 'date-fns';
 import { HistoryView } from './HistoryView';
+import { translations } from '../utils/i18n';
 
 const SettingsRow = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) => (
   <button type="button" onClick={onClick} className="w-full flex items-center justify-between px-8 py-6 hover:bg-emerald-50 dark:hover:bg-gray-700/50 transition-all group">
@@ -55,6 +56,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [tempEmail, setTempEmail] = useState(email || '');
   const [isUpdating, setIsUpdating] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+
+  const lang = settings.language || 'it';
+  const t = translations[lang].settings;
+  const tNav = translations[lang].nav;
 
   const showFeedback = (msg: string) => {
     setFeedback(msg);
@@ -139,8 +144,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   if (view === 'wallets') return (
     <div className="animate-in slide-in-from-right duration-300 min-h-screen bg-white dark:bg-gray-900 -mt-8 -mx-4 px-4 pt-8">
       <div className="max-w-4xl mx-auto space-y-6 pb-20">
-        <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> Impostazioni</button>
-        <h2 className="text-3xl font-bold dark:text-white">Gestione Ricariche</h2>
+        <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
+        <h2 className="text-3xl font-bold dark:text-white">{t.manageWallets}</h2>
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
           {settings.wallets.map(w => (
             <div key={w.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative">
@@ -148,7 +153,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button 
                 type="button"
                 onClick={() => {
-                  console.log("Elimina wallet:", w.name);
                   onUpdate({ ...settings, wallets: settings.wallets.filter(x => x.id !== w.id) });
                 }} 
                 className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center relative z-30"
@@ -174,7 +178,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => setIsAdding(true)} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 mt-4 transition-transform active:scale-95"><Plus size={20} /> Aggiungi Portafoglio</button>
+            <button type="button" onClick={() => setIsAdding(true)} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 mt-4 transition-transform active:scale-95"><Plus size={20} /> Aggiungi</button>
           )}
         </div>
       </div>
@@ -184,8 +188,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   if (view === 'categories') return (
     <div className="animate-in slide-in-from-right duration-300 min-h-screen bg-white dark:bg-gray-900 -mt-8 -mx-4 px-4 pt-8">
       <div className="max-w-4xl mx-auto space-y-6 pb-20">
-        <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> Impostazioni</button>
-        <h2 className="text-3xl font-bold dark:text-white">Gestione Categorie</h2>
+        <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
+        <h2 className="text-3xl font-bold dark:text-white">{t.manageCategories}</h2>
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
           {settings.categories.map(c => (
             <div key={c.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative">
@@ -194,7 +198,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <button 
                   type="button"
                   onClick={() => {
-                    console.log("Elimina categoria:", c.name);
                     onUpdate({ ...settings, categories: settings.categories.filter(x => x.id !== c.id) });
                   }} 
                   className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center relative z-30"
@@ -221,7 +224,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => setIsAdding(true)} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 mt-4 transition-transform active:scale-95"><Plus size={20} /> Aggiungi Categoria</button>
+            <button type="button" onClick={() => setIsAdding(true)} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 mt-4 transition-transform active:scale-95"><Plus size={20} /> Aggiungi</button>
           )}
         </div>
       </div>
@@ -244,31 +247,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <User size={32} />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white">Il tuo Profilo</h3>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white">{t.profile}</h3>
               <p className="text-gray-400 text-sm">{email}</p>
             </div>
           </div>
-          <button type="button" onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all">
-            <Edit3 size={14} /> Modifica
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all">
+              <Edit3 size={14} /> {t.edit}
+            </button>
+            <button 
+              type="button" 
+              onClick={() => onUpdate({ ...settings, language: lang === 'it' ? 'en' : 'it' })} 
+              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-xs hover:bg-blue-100 transition-all"
+            >
+              <Globe size={14} /> {lang === 'it' ? 'ITA' : 'ENG'}
+            </button>
+          </div>
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">Nome Visualizzato</label>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">{t.displayName}</label>
           <div className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 dark:text-white font-bold text-lg">{settings.name}</div>
         </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm overflow-hidden">
-        <SettingsRow icon={<Lock className="text-emerald-500" size={20} />} label="Cambia Password" onClick={() => setShowPasswordModal(true)} />
+        <SettingsRow icon={<Lock className="text-emerald-500" size={20} />} label={t.changePassword} onClick={() => setShowPasswordModal(true)} />
         <div className="h-[1px] bg-emerald-50 dark:bg-gray-700 mx-6"></div>
-        <SettingsRow icon={<Wallet className="text-emerald-500" size={20} />} label="Cambia Ricariche" onClick={() => setView('wallets')} />
+        <SettingsRow icon={<Wallet className="text-emerald-500" size={20} />} label={t.manageWallets} onClick={() => setView('wallets')} />
         <div className="h-[1px] bg-emerald-50 dark:bg-gray-700 mx-6"></div>
-        <SettingsRow icon={<Tag className="text-emerald-500" size={20} />} label="Cambia Categorie" onClick={() => setView('categories')} />
+        <SettingsRow icon={<Tag className="text-emerald-500" size={20} />} label={t.manageCategories} onClick={() => setView('categories')} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><DollarSign className="text-emerald-500" size={20} /> Budget Mensile</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><DollarSign className="text-emerald-500" size={20} /> {t.monthlyBudget}</h3>
           <div className="space-y-4">
             <input type="number" value={settings.monthlyBudget} onChange={(e) => onUpdate({ ...settings, monthlyBudget: Number(e.target.value) })} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none dark:text-white font-black text-2xl" />
             <select value={settings.currency} onChange={(e) => onUpdate({ ...settings, currency: e.target.value })} className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white px-4 py-3 rounded-2xl font-bold text-sm outline-none border-none">
@@ -279,9 +291,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">{settings.isDarkMode ? <Moon className="text-emerald-500" size={20} /> : <Sun className="text-emerald-500" size={20} />} Aspetto</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">{settings.isDarkMode ? <Moon className="text-emerald-500" size={20} /> : <Sun className="text-emerald-500" size={20} />} {t.appearance}</h3>
           <div className="flex items-center justify-between p-6 rounded-2xl bg-gray-50 dark:bg-gray-700">
-            <span className="font-bold text-gray-600 dark:text-gray-300">Tema {settings.isDarkMode ? 'Scuro' : 'Chiaro'}</span>
+            <span className="font-bold text-gray-600 dark:text-gray-300">{settings.isDarkMode ? t.darkMode : t.lightMode}</span>
             <button type="button" onClick={() => onUpdate({ ...settings, isDarkMode: !settings.isDarkMode })} className={`w-14 h-8 rounded-full relative transition-colors p-1 ${settings.isDarkMode ? 'bg-emerald-500' : 'bg-gray-300'}`}>
               <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-all ${settings.isDarkMode ? 'translate-x-6' : 'translate-x-0'}`}></div>
             </button>
@@ -290,20 +302,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><FileDown className="text-emerald-500" size={20} /> Dati e Archivio</h3>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><FileDown className="text-emerald-500" size={20} /> {t.dataArchive}</h3>
         <div className="grid grid-cols-2 gap-4">
-          <button type="button" onClick={() => setView('history')} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><History size={20} /> Storico Mesi</button>
-          <button type="button" onClick={() => alert("Funzione esportazione CSV pronta")} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><Download size={20} /> Esporta CSV</button>
+          <button type="button" onClick={() => setView('history')} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><History size={20} /> {t.history}</button>
+          <button type="button" onClick={() => alert("Funzione esportazione CSV pronta")} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><Download size={20} /> {t.export}</button>
         </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-red-50 dark:border-red-900/10 shadow-sm">
-        <h3 className="text-lg font-bold text-red-500 mb-6 flex items-center gap-2"><ShieldCheck size={20} /> Sicurezza</h3>
+        <h3 className="text-lg font-bold text-red-500 mb-6 flex items-center gap-2"><ShieldCheck size={20} /> {t.security}</h3>
         <div className="space-y-4">
-          <button type="button" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-3 p-5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-100 dark:hover:bg-gray-600 transition-all"><LogOut size={20} /> Disconnetti</button>
+          <button type="button" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-3 p-5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-100 dark:hover:bg-gray-600 transition-all"><LogOut size={20} /> {t.logout}</button>
           <div className="flex flex-col gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <button type="button" onClick={handleDeleteAccount} className="w-full py-3 text-red-400 text-xs font-bold hover:text-red-600 transition-all flex items-center justify-center gap-2"><Trash2 size={14} /> Cancella Account</button>
-            <button type="button" onClick={onClearData} className="w-full flex items-center justify-center gap-2 text-gray-400 text-[10px] font-bold uppercase tracking-wider hover:text-red-500 transition-all"><Trash2 size={10} /> Elimina dati Cloud</button>
+            <button type="button" onClick={handleDeleteAccount} className="w-full py-3 text-red-400 text-xs font-bold hover:text-red-600 transition-all flex items-center justify-center gap-2"><Trash2 size={14} /> {t.deleteAccount}</button>
+            <button type="button" onClick={onClearData} className="w-full flex items-center justify-center gap-2 text-gray-400 text-[10px] font-bold uppercase tracking-wider hover:text-red-500 transition-all"><Trash2 size={10} /> {t.clearData}</button>
           </div>
         </div>
       </div>

@@ -1,14 +1,18 @@
 
 import React from 'react';
 import { LayoutDashboard, List, BrainCircuit, CreditCard, Settings, Zap, Repeat } from 'lucide-react';
+import { translations } from '../utils/i18n';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions';
   setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions') => void;
+  lang?: 'it' | 'en';
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it' }) => {
+  const t = translations[lang].nav;
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Header */}
@@ -27,37 +31,37 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               active={activeTab === 'dashboard'} 
               onClick={() => setActiveTab('dashboard')}
               icon={<LayoutDashboard size={18} />}
-              label="Dashboard"
+              label={t.dashboard}
             />
             <NavButton 
               active={activeTab === 'list'} 
               onClick={() => setActiveTab('list')}
               icon={<List size={18} />}
-              label="Spese"
+              label={t.expenses}
             />
             <NavButton 
               active={activeTab === 'subscriptions'} 
               onClick={() => setActiveTab('subscriptions')}
               icon={<Repeat size={18} />}
-              label="Abbonamenti"
+              label={t.subscriptions}
             />
             <NavButton 
               active={activeTab === 'ricariche'} 
               onClick={() => setActiveTab('ricariche')}
               icon={<Zap size={18} />}
-              label="Ricariche"
+              label={t.wallets}
             />
             <NavButton 
               active={activeTab === 'ai'} 
               onClick={() => setActiveTab('ai')}
               icon={<BrainCircuit size={18} />}
-              label="AI Insights"
+              label={t.ai}
             />
             <NavButton 
               active={activeTab === 'settings'} 
               onClick={() => setActiveTab('settings')}
               icon={<Settings size={18} />}
-              label="Impostazioni"
+              label={t.settings}
             />
           </div>
         </div>
@@ -77,25 +81,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           active={activeTab === 'list'} 
           onClick={() => setActiveTab('list')}
           icon={<List />}
-          label="Spese"
+          label={t.expenses}
         />
         <MobileNavButton 
           active={activeTab === 'subscriptions'} 
           onClick={() => setActiveTab('subscriptions')}
           icon={<Repeat />}
-          label="Subs"
+          label={t.subscriptions.substring(0, 4)}
         />
         <MobileNavButton 
           active={activeTab === 'ricariche'} 
           onClick={() => setActiveTab('ricariche')}
           icon={<Zap />}
-          label="Wallet"
+          label={t.wallets}
         />
         <MobileNavButton 
           active={activeTab === 'settings'} 
           onClick={() => setActiveTab('settings')}
           icon={<Settings />}
-          label="Config"
+          label={t.settings.substring(0, 6)}
         />
       </nav>
     </div>
@@ -124,6 +128,6 @@ const MobileNavButton = ({ active, onClick, icon, label }: any) => (
     }`}
   >
     {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2 })}
-    <span className="text-[9px] font-bold uppercase tracking-tighter">{label}</span>
+    <span className="text-[9px] font-bold uppercase tracking-tighter truncate max-w-[60px]">{label}</span>
   </button>
 );

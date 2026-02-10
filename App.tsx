@@ -52,7 +52,8 @@ const App: React.FC = () => {
       currency: '€',
       isDarkMode: false,
       wallets: defaultWallets,
-      categories: defaultCategories
+      categories: defaultCategories,
+      language: 'it'
     };
 
     if (!saved) return defaultSettings;
@@ -61,6 +62,9 @@ const App: React.FC = () => {
       const parsed = JSON.parse(saved);
       if (!parsed.categories) {
         parsed.categories = defaultCategories;
+      }
+      if (!parsed.language) {
+        parsed.language = 'it';
       }
       return { ...defaultSettings, ...parsed };
     } catch {
@@ -212,7 +216,7 @@ const App: React.FC = () => {
   if (!session) return <Auth onSuccess={() => {}} />;
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         {/* Success Toast */}
         {successToast && (
@@ -242,10 +246,11 @@ const App: React.FC = () => {
         {activeTab !== 'dashboard' && (
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white capitalize">
-               {activeTab === 'list' ? 'Le tue Spese' : 
+               {activeTab === 'list' ? (userSettings.language === 'en' ? 'Your Expenses' : 'Le tue Spese') : 
                 activeTab === 'ai' ? 'AI Insights' : 
-                activeTab === 'ricariche' ? 'Portafogli' : 
-                activeTab === 'subscriptions' ? 'Abbonamenti' : 'Impostazioni'}
+                activeTab === 'ricariche' ? (userSettings.language === 'en' ? 'Wallets' : 'Portafogli') : 
+                activeTab === 'subscriptions' ? (userSettings.language === 'en' ? 'Subscriptions' : 'Abbonamenti') : 
+                (userSettings.language === 'en' ? 'Settings' : 'Impostazioni')}
             </h1>
           </div>
         )}
@@ -259,14 +264,19 @@ const App: React.FC = () => {
           <>
             {activeTab === 'dashboard' && (
               <Dashboard 
-                expenses={expenses} budget={userSettings.monthlyBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets}
+                expenses={expenses} 
+                budget={userSettings.monthlyBudget} 
+                userName={userSettings.name} 
+                currency={userSettings.currency} 
+                wallets={userSettings.wallets}
+                lang={userSettings.language}
               />
             )}
             
             {activeTab === 'list' && (
               <div className="space-y-6">
                 <div className="flex gap-3">
-                  <button type="button" onClick={() => { setPrefill(null); setShowForm(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"><Plus size={20} /> <span className="font-bold">Aggiungi</span></button>
+                  <button type="button" onClick={() => { setPrefill(null); setShowForm(true); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"><Plus size={20} /> <span className="font-bold">{userSettings.language === 'en' ? 'Add' : 'Aggiungi'}</span></button>
                   <button type="button" onClick={() => setShowScanner(true)} className="flex-1 bg-white dark:bg-gray-800 border-2 border-emerald-100 dark:border-gray-700 text-emerald-600 dark:text-emerald-400 px-4 py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"><ScanLine size={20} /> <span className="font-bold">Scan</span></button>
                 </div>
                 <ExpenseList expenses={expenses} onDelete={requestDeleteExpense} onEdit={(ex) => {setPrefill(ex); setShowForm(true);}} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
@@ -282,15 +292,21 @@ const App: React.FC = () => {
             )}
 
             {activeTab === 'ricariche' && (
-              <RicaricheView onRefill={(wallet) => {
-                setPrefill({ 
-                  description: `Ricarica ${wallet.name}`, 
-                  category: 'Altro', 
-                  paymentMethod: PaymentMethod.Bancomat, 
-                  date: format(new Date(), 'yyyy-MM-dd') 
-                });
-                setShowForm(true);
-              }} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />
+              <RicaricheView 
+                onRefill={(wallet) => {
+                  setPrefill({ 
+                    description: `Ricarica ${wallet.name}`, 
+                    category: 'Altro', 
+                    paymentMethod: PaymentMethod.Bancomat, 
+                    date: format(new Date(), 'yyyy-MM-dd') 
+                  });
+                  setShowForm(true);
+                }} 
+                onSaveExpense={handleSaveExpense}
+                expenses={expenses} 
+                currency={userSettings.currency} 
+                wallets={userSettings.wallets} 
+              />
             )}
 
             {activeTab === 'ai' && <AiInsights expenses={expenses} />}

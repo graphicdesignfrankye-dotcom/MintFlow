@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter } from 'date-fns';
-import { it } from 'date-fns/locale';
+import { it, enUS } from 'date-fns/locale';
+import { translations } from '../utils/i18n';
 
 interface DashboardProps {
   expenses: Expense[];
@@ -14,9 +15,11 @@ interface DashboardProps {
   userName?: string;
   currency?: string;
   wallets: WalletConfig[];
+  lang?: 'it' | 'en';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€', wallets }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€', wallets, lang = 'it' }) => {
+  const t = translations[lang].dashboard;
   const currentMonth = new Date();
   const currentMonthStart = startOfMonth(currentMonth);
   const currentMonthEnd = endOfMonth(currentMonth);
@@ -53,10 +56,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
 
   const balances = useMemo(() => {
     return wallets.map(w => {
+      // Calcolo entrate: Ricariche o Aggiustamenti (se non pagati dal wallet stesso)
       const totalRecharged = expenses
-        .filter(e => e.description.toLowerCase().includes(`ricarica ${w.name.toLowerCase()}`))
+        .filter(e => {
+          const desc = e.description.toLowerCase();
+          const name = w.name.toLowerCase();
+          const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`);
+          return isInflow && e.paymentMethod !== w.method;
+        })
         .reduce((sum, e) => sum + e.amount, 0);
       
+      // Calcolo uscite: Pagati col wallet (escluse ricariche self-loop che non dovrebbero esistere, ma per sicurezza)
+      // Nota: un 'aggiustamento' negativo avrà metodo = wallet, quindi rientra qui.
       const totalSpent = expenses
         .filter(e => e.paymentMethod === w.method && !e.description.toLowerCase().includes('ricarica'))
         .reduce((sum, e) => sum + e.amount, 0);
@@ -83,19 +94,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
   const COLORS = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#059669', '#047857', '#065f46', '#064e3b'];
   const formatValue = (val: number) => `${currency}${val.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
   const isDark = document.documentElement.classList.contains('dark');
+  const dateLocale = lang === 'en' ? enUS : it;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="mb-2">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Ciao, {userName}! 👋</h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">Ecco lo stato delle finanze di questo mese</p>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t.hello}, {userName}! 👋</h2>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">{t.subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2 bg-emerald-500 dark:bg-emerald-600 p-8 rounded-[2rem] text-white shadow-xl shadow-emerald-200/50 dark:shadow-none relative overflow-hidden">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <p className="text-emerald-50 text-xs font-bold uppercase tracking-wider mb-1">Speso questo mese</p>
+              <p className="text-emerald-50 text-xs font-bold uppercase tracking-wider mb-1">{t.spentThisMonth}</p>
               <h2 className="text-4xl font-black">{formatValue(totalCurrentMonth)}</h2>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
@@ -104,7 +116,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-emerald-50">
-              <span>Target: {currency}{budget.toLocaleString('it-IT')}</span>
+              <span>{t.target}: {currency}{budget.toLocaleString('it-IT')}</span>
               <span>{Math.round(budgetProgress)}%</span>
             </div>
             <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden">
@@ -117,15 +129,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
           <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
             <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl"><Target size={20} /></div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold">Rispetto a Mese Scorso</p>
+              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold">{t.vsLastMonth}</p>
               <p className={`font-bold ${diff <= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{diff <= 0 ? '-' : '+'}{Math.abs(diff).toFixed(1)}%</p>
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
             <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl"><Calendar size={20} /></div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold">Mese</p>
-              <p className="font-bold dark:text-white capitalize">{format(currentMonth, "MMMM yyyy", { locale: it })}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold">{t.month}</p>
+              <p className="font-bold dark:text-white capitalize">{format(currentMonth, "MMMM yyyy", { locale: dateLocale })}</p>
             </div>
           </div>
         </div>
@@ -138,8 +150,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
               <Clock size={20} />
             </div>
             <div>
-              <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">Spese Programmate</p>
-              <p className="text-[10px] text-emerald-500/70 dark:text-emerald-500/50 font-bold uppercase tracking-wider">Hai {futureExpenses.length} {futureExpenses.length === 1 ? 'spesa' : 'spese'} nei prossimi mesi</p>
+              <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">{t.plannedExpenses}</p>
+              <p className="text-[10px] text-emerald-500/70 dark:text-emerald-500/50 font-bold uppercase tracking-wider">{t.plannedCount(futureExpenses.length)}</p>
             </div>
           </div>
           <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">
@@ -149,7 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
       )}
 
       <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm overflow-x-auto">
-        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 ml-2">Saldi Wallet</h3>
+        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 ml-2">{t.walletBalances}</h3>
         <div className="flex gap-4 px-2">
           {balances.map((wallet) => (
             <div key={wallet.name} className="flex-shrink-0 w-40 p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/50">
@@ -165,7 +177,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm flex flex-col items-center">
-          <h3 className="text-lg font-bold dark:text-white mb-6 self-start">Distribuzione Spese</h3>
+          <h3 className="text-lg font-bold dark:text-white mb-6 self-start">{t.expenseDistribution}</h3>
           <div className="w-full flex justify-center py-4" style={{ height: '300px' }}>
             {categoryData.length > 0 ? (
               <PieChart width={280} height={280}>
@@ -179,12 +191,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
                   }} 
                 />
               </PieChart>
-            ) : <div className="h-full flex items-center text-gray-400">Nessun dato questo mese</div>}
+            ) : <div className="h-full flex items-center text-gray-400">{t.noData}</div>}
           </div>
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold dark:text-white mb-6">Top Categorie</h3>
+          <h3 className="text-lg font-bold dark:text-white mb-6">{t.topCategories}</h3>
           <div className="space-y-4">
             {categoryData.length > 0 ? (
               categoryData.sort((a,b) => b.value - a.value).slice(0, 5).map((entry, index) => (
@@ -197,7 +209,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
                 </div>
               ))
             ) : (
-              <div className="text-center py-10 text-gray-400 text-sm">Nessuna spesa registrata a {format(currentMonth, 'MMMM', { locale: it })}</div>
+              <div className="text-center py-10 text-gray-400 text-sm">{t.noExpenses} {format(currentMonth, 'MMMM', { locale: dateLocale })}</div>
             )}
           </div>
         </div>
