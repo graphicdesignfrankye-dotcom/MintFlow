@@ -1,12 +1,27 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MintFlow - Gestione Spese AI</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2310b981%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M19 5c-1.5 0-2.8.6-3.8 1.6l-1.3 1.3a.6.6 0 0 0-.2.4V19a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2Z%22/><path d=%22M5 18a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h3.9c.7 0 1.3.1 1.9.4l2.1-2.1a2 2 0 0 1 2.8 0l.7.7%22/><path d=%22M8 18v-5%22/><path d=%22M4 18v-5%22/><path d=%22M8 9h.01%22/><path d=%22M19 22v.01%22/></svg>">
+
+    <!-- iOS Web App support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#0BB37A" />
+
+    <!-- iPhone Home Screen Icon -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+
+    <!-- Favicons (browser tabs) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+
+    <!-- PWA Manifest (Android) -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -24,7 +39,12 @@
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet"
+    />
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -39,25 +59,22 @@
             background-color: #111827;
         }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0",
-    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-<body>
-    <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
-</body>
-</html>
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@^19.2.4",
+        "react/": "https://esm.sh/react@^19.2.4/",
+        "recharts": "https://esm.sh/recharts@^3.7.0",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+        "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+        "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+        "date-fns": "https://esm.sh/date-fns@^4.1.0",
+        "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
+      }
+    }
+    </script>
+
+    <link rel="stylesheet" href="/index.css" />
