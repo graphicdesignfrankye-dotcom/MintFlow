@@ -1,27 +1,14 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   
     <title>MintFlow - Gestione Spese AI</title>
+    <link rel="apple-touch-icon" href="/favicon-32x32.png?v=1">
+    <link rel="icon" type="image/png" href="/favicon-32x32.png?v=1">
 
-    <!-- iOS Web App support -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="theme-color" content="#0BB37A" />
-
-    <!-- iPhone Home Screen Icon -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
-
-    <!-- Favicons (browser tabs) -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-
-    <!-- PWA Manifest (Android) -->
-    <link rel="manifest" href="/manifest.json" />
-
-    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
-
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -40,10 +27,7 @@
         }
     </script>
 
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
@@ -60,7 +44,6 @@
         }
     </style>
 
-    <!-- Import Map -->
     <script type="importmap">
     {
       "imports": {
@@ -77,4 +60,11 @@
     }
     </script>
 
-    <link rel="stylesheet" href="/index.css" />
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
+</body>
+</html>
