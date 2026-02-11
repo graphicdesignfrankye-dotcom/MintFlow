@@ -226,50 +226,147 @@ const App: React.FC = () => {
   if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center bg-mint-50"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   if (!session) return <Auth onSuccess={() => {}} />;
 
-  return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
-        {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4">{successToast}</div>}
-        
-        {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={userSettings.monthlyBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} />}
-        {activeTab === 'list' && (
-          <div className="space-y-6">
-            <div className="flex gap-3">
-              <button onClick={() => { setPrefill(null); setShowForm(true); }} className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg"><Plus size={20} /> Aggiungi</button>
-            </div>
-            <ExpenseList expenses={expenses} onDelete={id => setExpenseToDelete(id)} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
-          </div>
-        )}
-        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
-        {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session.user.email} />}
-        {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
+return (
+  <Layout
+    activeTab={activeTab}
+    setActiveTab={setActiveTab}
+    lang={userSettings.language}
+    isDark={userSettings.isDarkMode}   // ⭐ L’UNICA RIGA CHE MANCAVA
+  >
+    <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+      {successToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4">
+          {successToast}
+        </div>
+      )}
 
-        {showForm && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative">
-              <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">✕</button>
-              <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">{prefill?.id ? 'Modifica' : 'Nuova Spesa'}</h2>
-              <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
-            </div>
-          </div>
-        )}
+      {activeTab === 'dashboard' && (
+        <Dashboard
+          expenses={expenses}
+          budget={userSettings.monthlyBudget}
+          userName={userSettings.name}
+          currency={userSettings.currency}
+          wallets={userSettings.wallets}
+          categories={userSettings.categories}
+          lang={userSettings.language}
+        />
+      )}
 
-        {expenseToDelete && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl text-center">
-              <div className="bg-red-100 text-red-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={32} /></div>
-              <h3 className="text-xl font-bold mb-2">Elimina?</h3>
-              <div className="flex flex-col gap-3 mt-6">
-                <button onClick={async () => { await db.deleteExpense(expenseToDelete); setExpenses(prev => prev.filter(e => e.id !== expenseToDelete)); setExpenseToDelete(null); }} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold">Elimina</button>
-                <button onClick={() => setExpenseToDelete(null)} className="w-full py-3 text-gray-400 font-bold">Annulla</button>
-              </div>
+      {activeTab === 'list' && (
+        <div className="space-y-6">
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setPrefill(null); setShowForm(true); }}
+              className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg"
+            >
+              <Plus size={20} /> Aggiungi
+            </button>
+          </div>
+
+          <ExpenseList
+            expenses={expenses}
+            onDelete={id => setExpenseToDelete(id)}
+            onEdit={ex => { setPrefill(ex); setShowForm(true); }}
+            currency={userSettings.currency}
+            wallets={userSettings.wallets}
+            categories={userSettings.categories}
+          />
+        </div>
+      )}
+
+      {activeTab === 'ricariche' && (
+        <RicaricheView
+          onRefill={w => {
+            setPrefill({
+              description: `Ricarica ${w.name}`,
+              category: 'Altro',
+              paymentMethod: PaymentMethod.Bancomat,
+              date: format(new Date(), 'yyyy-MM-dd')
+            });
+            setShowForm(true);
+          }}
+          onSaveExpense={handleSaveExpense}
+          expenses={expenses}
+          currency={userSettings.currency}
+          wallets={userSettings.wallets}
+        />
+      )}
+
+      {activeTab === 'ai' && <AiInsights expenses={expenses} />}
+
+      {activeTab === 'settings' && (
+        <SettingsView
+          settings={userSettings}
+          onUpdate={setUserSettings}
+          onClearData={() => {}}
+          onImport={handleImportCSV}
+          onExport={handleExportCSV}
+          expenses={expenses}
+          email={session.user.email}
+        />
+      )}
+
+      {activeTab === 'subscriptions' && (
+        <SubscriptionsView
+          expenses={expenses}
+          onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }}
+          onDelete={id => setExpenseToDelete(id)}
+          currency={userSettings.currency}
+        />
+      )}
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative">
+            <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">✕</button>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">
+              {prefill?.id ? 'Modifica' : 'Nuova Spesa'}
+            </h2>
+            <ExpenseForm
+              onSubmit={handleSaveExpense}
+              onCancel={() => setShowForm(false)}
+              initialData={prefill || undefined}
+              currency={userSettings.currency}
+              wallets={userSettings.wallets}
+              categories={userSettings.categories}
+              expenses={expenses}
+            />
+          </div>
+        </div>
+      )}
+
+      {expenseToDelete && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl text-center">
+            <div className="bg-red-100 text-red-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={32} />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Elimina?</h3>
+            <div className="flex flex-col gap-3 mt-6">
+              <button
+                onClick={async () => {
+                  await db.deleteExpense(expenseToDelete);
+                  setExpenses(prev => prev.filter(e => e.id !== expenseToDelete));
+                  setExpenseToDelete(null);
+                }}
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold"
+              >
+                Elimina
+              </button>
+
+              <button
+                onClick={() => setExpenseToDelete(null)}
+                className="w-full py-3 text-gray-400 font-bold"
+              >
+                Annulla
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </Layout>
-  );
-};
+        </div>
+      )}
+    </div>
+  </Layout>
+);
+
 
 export default App;
