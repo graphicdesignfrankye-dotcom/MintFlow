@@ -1,83 +1,74 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>MintFlow - Gestione Spese AI</title>
+    <title>MintFlow - Gestione Spese AI</title>
 
-  <!-- Icona iPhone/iOS (Aggiungi a schermata Home) -->
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
+    <!-- Icona iPhone/iOS (Aggiungi a schermata Home) -->
+    /apple-touch-icon.png?v=3">
 
-  <!-- Favicon per browser -->
-  <link rel="icon" type="image/png" href="/favicon-32x32.png?v=3" />
+    <!-- Favicon per browser desktop -->
+    /favicon-32x32.png?v=3">
 
-  <!-- Manifest per Android & PWA -->
-  <link rel="manifest" href="/manifest.json" />
+    <!-- Manifest per Android & PWA -->
+    /manifest.json">
 
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            mint: {
-              50: '#f0fff4',
-              100: '#d1fae5',
-              500: '#10b981',
-              600: '#059669',
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        mint: {
+                            50: '#f0fff4',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                        }
+                    }
+                }
             }
-          }
         }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease;
+        }
+        html:not(.dark) body {
+            background-color: #ffffff;
+        }
+        html.dark body {
+            background-color: #111827;
+        }
+    </style>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@^19.2.4",
+        "react/": "https://esm.sh/react@^19.2.4/",
+        "recharts": "https://esm.sh/recharts@^3.7.0",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+        "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+        "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+        "date-fns": "https://esm.sh/date-fns@^4.1.0",
+        "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
       }
     }
-  </script>
-
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      padding: 0;
-      transition: background-color 0.3s ease;
-    }
-    html:not(.dark) body {
-      background-color: #ffffff;
-    }
-    html.dark body {
-      background-color: #111827;
-    }
-  </style>
-
-  <!-- Import map (come da tua versione funzionante) -->
-  <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@^19.2.4",
-      "react/": "https://esm.sh/react@^19.2.4/",
-      "recharts": "https://esm.sh/recharts@^3.7.0",
-      "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-      "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-      "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
-      "date-fns": "https://esm.sh/date-fns@^4.1.0",
-      "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
-      "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
-    }
-  }
-  </script>
-
-  <!-- CSS locale (senza / iniziale, come prima) -->
-  <link rel="stylesheet" href="index.css" />
+    </script>
 </head>
 
 <body>
-  <div id="root"></div>
-
-  <!-- Entrypoint React (senza / iniziale, come prima) -->
-  <script type="module" src="index.tsx"></script>
+    <div id="root"></div>
 </body>
 </html>
