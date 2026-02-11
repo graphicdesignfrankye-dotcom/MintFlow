@@ -4,31 +4,29 @@ import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
 import { ExpenseForm } from './components/ExpenseForm';
 import { AiInsights } from './components/AiInsights';
+import { ReceiptScanner } from './components/ReceiptScanner';
 import { SettingsView } from './components/SettingsView';
 import { RicaricheView } from './components/RicaricheView';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { Auth } from './components/Auth';
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig } from './types';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { db, supabase } from './services/supabase';
-import { format } from 'date-fns';
+import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
+import { db, auth, supabase } from './services/supabase';
+import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth } from 'date-fns';
 
 const App: React.FC = () => {
-
   const [session, setSession] = useState<any>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showNewMonthToast, setShowNewMonthToast] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
-  // -----------------------------
-  // USER SETTINGS + DARK MODE
-  // -----------------------------
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('mintflow_user_settings');
-
     const defaultWallets: WalletConfig[] = [
       { id: 'w1', name: 'Prepagata Flash', method: PaymentMethod.Flash, icon: 'zap' },
       { id: 'w2', name: 'Prepagata Revolut', method: PaymentMethod.Revolut, icon: 'wallet' },
@@ -46,7 +44,7 @@ const App: React.FC = () => {
       { id: 'c8', name: 'Altro', color: '#64748b' }
     ];
 
-    const defaults: UserSettings = {
+    const defaultSettings: UserSettings = {
       name: 'Utente',
       monthlyBudget: 1000,
       currency: '€',
@@ -56,152 +54,34 @@ const App: React.FC = () => {
       language: 'it'
     };
 
-    if (!saved) return defaults;
-    try { return { ...defaults, ...JSON.parse(saved) }; }
-    catch { return defaults; }
+    if (!saved) return defaultSettings;
+
+    try {
+      const parsed = JSON.parse(saved);
+      return { ...defaultSettings, ...parsed };
+    } catch {
+      return defaultSettings;
+    }
   });
 
-  // -----------------------------
-  // INIZIALIZZA SESSIONE
-  // -----------------------------
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings' | 'subscriptions'>('dashboard');
+  const [showForm, setShowForm] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
+
   useEffect(() => {
-    const load = async () => {
+    const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-      setIsInitialLoading(false);
-    }
-    load();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // -----------------------------
-  // FETCH SPESE
-  // -----------------------------
-  const fetchExpenses = useCallback(async () => {
-    if (!session?.user?.id) return;
-    try {
-      setIsLoading(true);
-      const data = await db.getExpenses(session.user.id);
-      setExpenses(data);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [session]);
-
-  useEffect(() => {
-    if (session?.user?.id) fetchExpenses();
-  }, [session, fetchExpenses]);
-
-  // -----------------------------
-  // SALVA SPESA
-  // -----------------------------
-  const handleSaveExpense = async (expenseData: Omit<Expense, 'id'>) => {
-    try {
-      setIsSyncing(true);
-      let saved: Expense | null;
-
-      saved = await db.addExpense(expenseData, session.user.id);
-
-      if (saved) {
-        setExpenses(prev => [saved!, ...prev]);
-        setSuccessToast("Operazione completata!");
-        setTimeout(() => setSuccessToast(null), 2500);
+      if (session?.user) {
+        const metadata = session.user.user_metadata;
+        const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
+        setUserSettings(prev => ({ ...prev, name: displayName }));
       }
-
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  if (isInitialLoading)
-    return <div className="min-h-screen flex items-center justify-center bg-mint-50">
-      <Loader2 className="animate-spin text-emerald-500" size={48} />
-    </div>;
-
-  if (!session)
-    return <Auth onSuccess={() => { }} />;
-
-  // -----------------------------
-  //  ⭐  QUI LA MODIFICA IMPORTANTE
-  // -----------------------------
-  return (
-    <Layout
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
-      lang={userSettings.language}
-      isDark={userSettings.isDarkMode}      // ⭐ SENZA QUESTA RIGA, DARK MODE NON FUNZIONA
-    >
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
-
-        {successToast && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl">
-            {successToast}
-          </div>
-        )}
-
-        {activeTab === 'dashboard' &&
-          <Dashboard
-            expenses={expenses}
-            budget={userSettings.monthlyBudget}
-            userName={userSettings.name}
-            currency={userSettings.currency}
-            wallets={userSettings.wallets}
-            categories={userSettings.categories}
-            lang={userSettings.language}
-          />
-        }
-
-        {activeTab === 'list' &&
-          <ExpenseList
-            expenses={expenses}
-            onDelete={id => setExpenseToDelete(id)}
-            onEdit={ex => { }}
-            currency={userSettings.currency}
-            wallets={userSettings.wallets}
-            categories={userSettings.categories}
-          />
-        }
-
-        {activeTab === 'ricariche' &&
-          <RicaricheView
-            onRefill={() => { }}
-            onSaveExpense={handleSaveExpense}
-            expenses={expenses}
-            currency={userSettings.currency}
-            wallets={userSettings.wallets}
-          />
-        }
-
-        {activeTab === 'ai' &&
-          <AiInsights expenses={expenses} />
-        }
-
-        {activeTab === 'settings' &&
-          <SettingsView
-            settings={userSettings}
-            onUpdate={setUserSettings}
-            onClearData={() => { }}
-            onImport={() => { }}
-            onExport={() => { }}
-            expenses={expenses}
-            email={session.user.email}
-          />
-        }
-
-        {activeTab === 'subscriptions' &&
-          <SubscriptionsView
-            expenses={expenses}
-            onAddSub={() => { }}
-            onDelete={() => { }}
-            currency={userSettings.currency}
-          />
-        }
-
-      </div>
-    </Layout>
-  );
-};
-
-export default App;
+      setIsInitialLoading(false);
+    };
+    initSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
