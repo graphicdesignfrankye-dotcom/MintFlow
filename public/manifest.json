@@ -1,5 +1,5 @@
 {
-  "name": "Mint Flow",
+  "name": "MintFlow",
   "short_name": "MintFlow",
   "start_url": "/",
   "display": "standalone",
@@ -7,15 +7,14 @@
   "theme_color": "#0BB37A",
   "icons": [
     {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512-transparent.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
