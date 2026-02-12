@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2 } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
-import { format } from 'date-fns';
+import { format, isBefore, startOfToday, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface RicaricheViewProps {
@@ -19,21 +19,30 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const balances = useMemo(() => {
+    const today = startOfToday();
+    
     return wallets.map(w => {
       // Ricariche (entrate) + Aggiustamenti Positivi
       const totalRecharged = expenses
         .filter(e => {
           const desc = e.description.toLowerCase();
           const name = w.name.toLowerCase();
-          // Include ricariche E aggiustamenti manuali che non sono uscite (quindi metodo diverso dal wallet)
           const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`);
           return isInflow && e.paymentMethod !== w.method;
         })
         .reduce((sum, e) => sum + e.amount, 0);
       
-      // Spese (uscite)
+      // Spese (uscite) - Vengono scalate SOLO se la data è OGGI o FUTURA
       const totalSpent = expenses
-        .filter(e => e.paymentMethod === w.method && !e.description.toLowerCase().includes('ricarica'))
+        .filter(e => {
+          const isWalletMethod = e.paymentMethod === w.method;
+          const isNotRefill = !e.description.toLowerCase().includes('ricarica');
+          const expenseDate = parseISO(e.date);
+          // Se la data è prima di oggi, non scaliamo il saldo (richiesta utente)
+          const isNotPast = !isBefore(expenseDate, today);
+          
+          return isWalletMethod && isNotRefill && isNotPast;
+        })
         .reduce((sum, e) => sum + e.amount, 0);
       
       return {
@@ -78,8 +87,6 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
         description: `Aggiustamento ${editingWallet.name}`,
         amount: Math.abs(diff),
         category: 'Altro',
-        // Se positivo (entrata): metodo 'Contanti' (o altro, purché non sia il wallet stesso)
-        // Se negativo (uscita): metodo = wallet stesso (così conta come spesa)
         paymentMethod: isPositive ? PaymentMethod.Contanti : editingWallet.method,
         date: format(new Date(), 'yyyy-MM-dd'),
         isSubscription: false
@@ -97,10 +104,10 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">I tuoi Portafogli</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Monitora i saldi e registra le ricariche.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Le spese passate non influenzano il saldo residuo.</p>
         </div>
         <div className="hidden md:flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800 uppercase tracking-widest">
-          <Info size={12} /> Live Sync
+          <Info size={12} /> Smart Balance
         </div>
       </div>
 
@@ -146,10 +153,9 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
         </div>
       </div>
 
-      {/* Edit Modal */}
       {editingWallet && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold dark:text-white">Modifica Saldo</h3>
               <button onClick={() => setEditingWallet(null)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
@@ -166,7 +172,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
             </div>
 
             <div className="mb-6">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nuovo Saldo</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nuovo Saldo Attuale</label>
               <input 
                 autoFocus
                 type="number" 
@@ -175,7 +181,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
                 onChange={(e) => setNewBalance(e.target.value)} 
                 className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-black text-2xl" 
               />
-              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Verrà creata una transazione di aggiustamento nascosta</p>
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Verrà creata una transazione di aggiustamento</p>
             </div>
 
             <button 
@@ -183,7 +189,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
               disabled={isSubmitting}
               className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-emerald-600 transition-colors"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />} Salva Modifica
+              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />} Salva Saldo
             </button>
           </div>
         </div>

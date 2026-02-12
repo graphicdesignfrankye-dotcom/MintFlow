@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+
+import React from 'react';
 import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat } from 'lucide-react';
 import { translations } from '../utils/i18n';
 
@@ -7,17 +8,10 @@ interface LayoutProps {
   activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions';
   setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions') => void;
   lang?: 'it' | 'en';
-  /** stato scuro passato dal parent */
-  isDark?: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it', isDark = false }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it' }) => {
   const t = translations[lang].nav;
-
-  // Applica / rimuove .dark su <html> quando cambia isDark
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
@@ -32,28 +26,81 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               MintFlow
             </span>
           </div>
-
-          {/* Nav Desktop */}
           <div className="hidden md:flex items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
-            <NavButton active={activeTab === 'dashboard'}    onClick={() => setActiveTab('dashboard')}    icon={<LayoutDashboard size={18} />} label={t.dashboard} />
-            <NavButton active={activeTab === 'list'}         onClick={() => setActiveTab('list')}         icon={<List size={18} />}            label={t.expenses} />
-            <NavButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} icon={<Repeat size={18} />}         label={t.subscriptions} />
-            <NavButton active={activeTab === 'ricariche'}    onClick={() => setActiveTab('ricariche')}     icon={<Zap size={18} />}            label={t.wallets} />
-            <NavButton active={activeTab === 'ai'}           onClick={() => setActiveTab('ai')}           icon={<BrainCircuit size={18} />}    label={t.ai} />
-            <NavButton active={activeTab === 'settings'}     onClick={() => setActiveTab('settings')}     icon={<Settings size={18} />}        label={t.settings} />
+            <NavButton 
+              active={activeTab === 'dashboard'} 
+              onClick={() => setActiveTab('dashboard')}
+              icon={<LayoutDashboard size={18} />}
+              label={t.dashboard}
+            />
+            <NavButton 
+              active={activeTab === 'list'} 
+              onClick={() => setActiveTab('list')}
+              icon={<List size={18} />}
+              label={t.expenses}
+            />
+            <NavButton 
+              active={activeTab === 'subscriptions'} 
+              onClick={() => setActiveTab('subscriptions')}
+              icon={<Repeat size={18} />}
+              label={t.subscriptions}
+            />
+            <NavButton 
+              active={activeTab === 'ricariche'} 
+              onClick={() => setActiveTab('ricariche')}
+              icon={<Zap size={18} />}
+              label={t.wallets}
+            />
+            <NavButton 
+              active={activeTab === 'ai'} 
+              onClick={() => setActiveTab('ai')}
+              icon={<BrainCircuit size={18} />}
+              label={t.ai}
+            />
+            <NavButton 
+              active={activeTab === 'settings'} 
+              onClick={() => setActiveTab('settings')}
+              icon={<Settings size={18} />}
+              label={t.settings}
+            />
           </div>
         </div>
       </header>
 
       <main>{children}</main>
 
-      {/* Bottom Nav Mobile */}
+      {/* Bottom Nav for Mobile */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-2 flex items-center justify-around pb-4 transition-colors">
-        <MobileNavButton active={activeTab === 'dashboard'}     onClick={() => setActiveTab('dashboard')}     icon={<LayoutDashboard />} label="Home" />
-        <MobileNavButton active={activeTab === 'list'}          onClick={() => setActiveTab('list')}          icon={<List />}           label={t.expenses} />
-        <MobileNavButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} icon={<Repeat />}         label={t.subscriptions.substring(0, 4)} />
-        <MobileNavButton active={activeTab === 'ricariche'}     onClick={() => setActiveTab('ricariche')}     icon={<Zap />}            label={t.wallets} />
-        <MobileNavButton active={activeTab === 'settings'}      onClick={() => setActiveTab('settings')}      icon={<Settings />}       label={t.settings.substring(0, 6)} />
+        <MobileNavButton 
+          active={activeTab === 'dashboard'} 
+          onClick={() => setActiveTab('dashboard')}
+          icon={<LayoutDashboard />}
+          label="Home"
+        />
+        <MobileNavButton 
+          active={activeTab === 'list'} 
+          onClick={() => setActiveTab('list')}
+          icon={<List />}
+          label={t.expenses}
+        />
+        <MobileNavButton 
+          active={activeTab === 'subscriptions'} 
+          onClick={() => setActiveTab('subscriptions')}
+          icon={<Repeat />}
+          label={t.subscriptions.substring(0, 4)}
+        />
+        <MobileNavButton 
+          active={activeTab === 'ricariche'} 
+          onClick={() => setActiveTab('ricariche')}
+          icon={<Zap />}
+          label={t.wallets}
+        />
+        <MobileNavButton 
+          active={activeTab === 'settings'} 
+          onClick={() => setActiveTab('settings')}
+          icon={<Settings />}
+          label={t.settings.substring(0, 6)}
+        />
       </nav>
     </div>
   );
@@ -63,8 +110,8 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-      active
-        ? 'bg-emerald-500 text-white shadow-md font-semibold'
+      active 
+        ? 'bg-emerald-500 text-white shadow-md font-semibold' 
         : 'text-emerald-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-700/50'
     }`}
   >

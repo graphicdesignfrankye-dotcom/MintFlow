@@ -23,8 +23,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
 
   const filteredExpenses = expenses
     .filter(e => {
+      // FILTRO 1: Nascondi gli aggiustamenti tecnici
+      const isAdjustment = e.description.toLowerCase().includes('aggiustamento');
+      if (isAdjustment) return false;
+
+      // FILTRO 2: Ricerca testuale
       const matchesSearch = e.description.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // FILTRO 3: Categoria
       const matchesCategory = filterCategory === 'Tutti' || e.category === filterCategory;
+      
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -42,7 +50,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
     if (lower.includes('abbonament') || lower.includes('netflix') || lower.includes('spotify') || lower.includes('sub')) return <Repeat size={20} />;
     if (lower.includes('cibo') || lower.includes('ristorant') || lower.includes('pranzo') || lower.includes('cena') || lower.includes('spesa')) return <Utensils size={20} />;
     
-    // Default per 'Altro' o categorie non riconosciute
     return <ShoppingBag size={20} />;
   };
 
@@ -87,7 +94,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                   className={`p-4 flex items-center justify-between hover:bg-emerald-50/30 dark:hover:bg-gray-700/30 transition-colors ${isDateInFuture ? 'bg-red-50/20' : ''}`}
                 >
                   <div className="flex items-center gap-3 md:gap-4 overflow-hidden flex-1 min-w-0">
-                    {/* Icona Categoria */}
                     <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center font-bold transition-colors ${
                       isDateInFuture 
                         ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
@@ -101,7 +107,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                         {expense.description}
                       </h4>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-medium text-gray-400">
-                        {/* Se futura, mostriamo anche un piccolo warning testuale o icona accanto alla data */}
                         {isDateInFuture && <AlertCircle size={10} className="text-red-500" />}
                         <span className={`whitespace-nowrap ${isDateInFuture ? "text-red-500" : ""}`}>{format(expenseDate, 'dd MMM yyyy', { locale: it })}</span>
                         <span>•</span>

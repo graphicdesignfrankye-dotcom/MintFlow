@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -10,9 +11,9 @@ import { RicaricheView } from './components/RicaricheView';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { Auth } from './components/Auth';
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig } from './types';
-import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
-import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth } from 'date-fns';
+import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth, getDate } from 'date-fns';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -20,11 +21,11 @@ const App: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [showNewMonthToast, setShowNewMonthToast] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
-
+  const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
+  
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
-
+  
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('mintflow_user_settings');
     const defaultWallets: WalletConfig[] = [
@@ -55,7 +56,7 @@ const App: React.FC = () => {
     };
 
     if (!saved) return defaultSettings;
-
+    
     try {
       const parsed = JSON.parse(saved);
       return { ...defaultSettings, ...parsed };
@@ -64,10 +65,30 @@ const App: React.FC = () => {
     }
   });
 
+  // Salva le impostazioni ogni volta che cambiano
+  useEffect(() => {
+    localStorage.setItem('mintflow_user_settings', JSON.stringify(userSettings));
+  }, [userSettings]);
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings' | 'subscriptions'>('dashboard');
   const [showForm, setShowForm] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
+
+  // Controllo budget mensile o nuovo utente
+  useEffect(() => {
+    if (session && !isInitialLoading) {
+      const today = new Date();
+      const isFirstDay = getDate(today) === 1;
+      const lastUpdate = userSettings.lastBudgetUpdate ? parseISO(userSettings.lastBudgetUpdate) : null;
+      
+      // Mostra il prompt se:
+      // 1. È un nuovo utente (nessun lastUpdate)
+      // 2. È il primo del mese e l'ultimo aggiornamento non è di questo mese
+      if (!lastUpdate || (isFirstDay && !isSameMonth(lastUpdate, today))) {
+        setShowBudgetPrompt(true);
+      }
+    }
+  }, [session, isInitialLoading, userSettings.lastBudgetUpdate]);
 
   useEffect(() => {
     const initSession = async () => {
@@ -114,7 +135,7 @@ const App: React.FC = () => {
         savedExpense = await db.updateExpense(prefill.id, expenseData);
         if (savedExpense) setExpenses(prev => prev.map(e => e.id === savedExpense!.id ? savedExpense! : e));
       } else {
-        savedExpense = await db.addExpense(expenseData, session!.user.id);
+        savedExpense = await db.addExpense(expenseData, session.user.id);
         if (savedExpense) setExpenses(prev => [savedExpense!, ...prev]);
       }
       setShowForm(false);
@@ -128,6 +149,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSetMonthlyBudget = (amount: number) => {
+    setUserSettings(prev => ({
+      ...prev,
+      monthlyBudget: amount,
+      lastBudgetUpdate: new Date().toISOString()
+    }));
+    setShowBudgetPrompt(false);
+    setSuccessToast("Budget impostato con successo!");
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
   const handleImportCSV = async (file: File): Promise<{ imported: number, skipped: number, errors: string[], debugInfo: string }> => {
     if (!session?.user?.id) throw new Error("Utente non autenticato.");
 
@@ -135,7 +167,7 @@ const App: React.FC = () => {
     let importedCount = 0;
     let skippedCount = 0;
     const errors: string[] = [];
-
+    
     try {
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
@@ -143,7 +175,7 @@ const App: React.FC = () => {
 
       const separator = lines[0].includes(';') ? ';' : ',';
       const headers = lines[0].toLowerCase().split(separator).map(h => h.trim());
-
+      
       const dateIdx = headers.findIndex(h => h.includes('dat') || h.includes('giorno'));
       const descIdx = headers.findIndex(h => h.includes('desc') || h.includes('causale') || h.includes('testo'));
       const amountIdx = headers.findIndex(h => h.includes('importo') || h.includes('euro') || h.includes('valore') || h.includes('amount'));
@@ -153,7 +185,7 @@ const App: React.FC = () => {
 
       for (let i = startLine; i < lines.length; i++) {
         const parts = lines[i].split(separator).map(p => p.trim().replace(/^"|"$/g, ''));
-
+        
         try {
           const rawDate = parts[dateIdx === -1 ? 0 : dateIdx];
           const rawDesc = parts[descIdx === -1 ? 1 : descIdx];
@@ -195,8 +227,8 @@ const App: React.FC = () => {
             category: category,
             paymentMethod: PaymentMethod.Contanti,
             isSubscription: false
-          }, session!.user.id);
-
+          }, session.user.id);
+          
           importedCount++;
         } catch (e: any) {
           errors.push(`Riga ${i+1}: ${e.message}`);
@@ -226,15 +258,10 @@ const App: React.FC = () => {
   if (!session) return <Auth onSuccess={() => {}} />;
 
   return (
-    <Layout
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
-      lang={userSettings.language}
-      isDark={userSettings.isDarkMode}   // ⭐ questa riga abilita davvero il tema scuro
-    >
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4">{successToast}</div>}
-
+        
         {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={userSettings.monthlyBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} />}
         {activeTab === 'list' && (
           <div className="space-y-6">
@@ -246,7 +273,7 @@ const App: React.FC = () => {
         )}
         {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
         {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session!.user.email!} />}
+        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session.user.email} />}
         {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
 
         {showForm && (
@@ -257,6 +284,15 @@ const App: React.FC = () => {
               <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
             </div>
           </div>
+        )}
+
+        {showBudgetPrompt && (
+          <BudgetPromptModal 
+            onConfirm={handleSetMonthlyBudget} 
+            initialValue={userSettings.monthlyBudget} 
+            currency={userSettings.currency}
+            isNewUser={!userSettings.lastBudgetUpdate}
+          />
         )}
 
         {expenseToDelete && (
@@ -273,6 +309,67 @@ const App: React.FC = () => {
         )}
       </div>
     </Layout>
+  );
+};
+
+// Componente Modale per il Prompt del Budget
+const BudgetPromptModal: React.FC<{ 
+  onConfirm: (amount: number) => void; 
+  initialValue: number;
+  currency: string;
+  isNewUser: boolean;
+}> = ({ onConfirm, initialValue, currency, isNewUser }) => {
+  const [value, setValue] = useState(initialValue.toString());
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-md p-10 shadow-2xl border-4 border-emerald-500 animate-in zoom-in-95 duration-500">
+        <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600 shadow-inner">
+          <Target size={40} />
+        </div>
+        
+        <h2 className="text-3xl font-black text-gray-900 dark:text-white text-center mb-2">
+          {isNewUser ? 'Benvenuto su MintFlow!' : 'Nuovo Mese!'}
+        </h2>
+        <p className="text-gray-500 dark:text-gray-400 text-center mb-8 font-medium">
+          {isNewUser 
+            ? 'Iniziamo impostando il tuo budget mensile di riferimento.' 
+            : 'È il momento di pianificare le spese per questo nuovo mese.'}
+        </p>
+
+        <div className="mb-8">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3 ml-2 text-center">Il tuo budget target</label>
+          <div className="relative">
+             <input 
+              autoFocus
+              type="number" 
+              value={value} 
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full bg-emerald-50 dark:bg-gray-700 text-gray-900 dark:text-white text-4xl font-black py-6 rounded-3xl text-center outline-none border-2 border-transparent focus:border-emerald-500 transition-all shadow-inner"
+            />
+            <span className="absolute right-8 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 text-2xl font-bold pointer-events-none opacity-50">
+              {currency}
+            </span>
+          </div>
+        </div>
+
+        <button 
+          onClick={() => onConfirm(parseFloat(value) || 0)}
+          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-200 dark:shadow-none text-lg active:scale-95"
+        >
+          Imposta Budget <ArrowRight size={20} />
+        </button>
+        
+        {!isNewUser && (
+          <button 
+            onClick={() => onConfirm(initialValue)}
+            className="w-full mt-4 py-2 text-gray-400 dark:text-gray-500 font-bold hover:text-gray-600 transition-colors text-sm"
+          >
+            Mantieni quello del mese scorso
+          </button>
+        )}
+      </div>
+    </div>
   );
 };
 

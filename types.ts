@@ -42,6 +42,7 @@ export interface UserSettings {
   wallets: WalletConfig[];
   categories: CategoryConfig[];
   language: 'it' | 'en';
+  lastBudgetUpdate?: string; // Data dell'ultima volta che il budget è stato confermato
 }
 
 export interface AiInsight {
