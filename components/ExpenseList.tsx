@@ -5,8 +5,11 @@ import {
   Trash2, Search, Filter, Edit2, AlertCircle, 
   Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils
 } from 'lucide-react';
-import { format, isFuture } from 'date-fns';
-import { it } from 'date-fns/locale';
+// Import date-fns functions directly from their modules to fix named export errors
+import format from 'date-fns/format';
+import isFuture from 'date-fns/isFuture';
+// Import locales directly from their modules for date-fns v2 compatibility
+import it from 'date-fns/locale/it';
 
 interface ExpenseListProps {
   expenses: Expense[];

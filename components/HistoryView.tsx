@@ -1,8 +1,13 @@
 
 import React from 'react';
 import { Expense } from '../types';
-import { format, parseISO, startOfMonth, isSameMonth } from 'date-fns';
-import { it } from 'date-fns/locale';
+// Import date-fns functions directly from their modules to fix named export errors
+import format from 'date-fns/format';
+import parseISO from 'date-fns/parseISO';
+import startOfMonth from 'date-fns/startOfMonth';
+import isSameMonth from 'date-fns/isSameMonth';
+// Import locales directly from their modules for date-fns v2 compatibility
+import it from 'date-fns/locale/it';
 import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers } from 'lucide-react';
 
 interface HistoryViewProps {

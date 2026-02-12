@@ -3,7 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { CategoryConfig, Expense, PaymentMethod, WalletConfig } from '../types';
 import { SmartCategorizer } from './SmartCategorizer';
 import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap, Copy } from 'lucide-react';
-import { isSameMonth, isAfter, startOfMonth, parseISO, startOfToday } from 'date-fns';
+// Import date-fns functions directly from their modules to fix named export errors
+import isSameMonth from 'date-fns/isSameMonth';
+import isAfter from 'date-fns/isAfter';
+import startOfMonth from 'date-fns/startOfMonth';
+import parseISO from 'date-fns/parseISO';
+import startOfToday from 'date-fns/startOfToday';
 
 interface ExpenseFormProps {
   onSubmit: (expense: Omit<Expense, 'id'>) => Promise<void> | void;

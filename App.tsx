@@ -13,7 +13,14 @@ import { Auth } from './components/Auth';
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig } from './types';
 import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
-import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth, getDate } from 'date-fns';
+// Import date-fns functions directly from their modules to fix named export errors
+import startOfMonth from 'date-fns/startOfMonth';
+import format from 'date-fns/format';
+import isSameMonth from 'date-fns/isSameMonth';
+import parseISO from 'date-fns/parseISO';
+import isAfter from 'date-fns/isAfter';
+import endOfMonth from 'date-fns/endOfMonth';
+import getDate from 'date-fns/getDate';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);

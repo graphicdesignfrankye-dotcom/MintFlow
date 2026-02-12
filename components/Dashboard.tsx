@@ -5,8 +5,19 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter } from 'date-fns';
-import { it, enUS } from 'date-fns/locale';
+// Import date-fns functions directly from their modules to fix named export errors
+import format from 'date-fns/format';
+import startOfMonth from 'date-fns/startOfMonth';
+import endOfMonth from 'date-fns/endOfMonth';
+import isWithinInterval from 'date-fns/isWithinInterval';
+import subMonths from 'date-fns/subMonths';
+import isAfter from 'date-fns/isAfter';
+import startOfToday from 'date-fns/startOfToday';
+import isBefore from 'date-fns/isBefore';
+import parseISO from 'date-fns/parseISO';
+// Import locales directly from their modules for date-fns v2 compatibility
+import it from 'date-fns/locale/it';
+import enUS from 'date-fns/locale/en-US';
 import { translations } from '../utils/i18n';
 
 interface DashboardProps {
@@ -24,6 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
   const currentMonth = new Date();
   const currentMonthStart = startOfMonth(currentMonth);
   const currentMonthEnd = endOfMonth(currentMonth);
+  const today = startOfToday();
 
   const currentMonthExpenses = useMemo(() => {
     return expenses.filter(e => 
@@ -31,12 +43,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
     );
   }, [expenses, currentMonthStart, currentMonthEnd]);
 
-  const futureExpenses = useMemo(() => {
-    return expenses.filter(e => isAfter(new Date(e.date), currentMonthEnd));
-  }, [expenses, currentMonthEnd]);
-
   // FUNZIONE HELPER PER FILTRARE SPESE REALI PER IL BUDGET
-  // Include "Ricarica" nel budget, ma esclude "Aggiustamento"
   const filterBudgetExpenses = (expenseList: Expense[]) => {
     return expenseList.filter(e => {
       const desc = e.description.toLowerCase();
@@ -45,12 +52,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
     });
   };
 
-  // Totale speso mese corrente (incluse ricariche)
   const totalCurrentMonth = useMemo(() => {
     return filterBudgetExpenses(currentMonthExpenses).reduce((sum, e) => sum + e.amount, 0);
   }, [currentMonthExpenses]);
 
-  // Totale speso mese scorso (per confronto omogeneo)
   const totalLastMonth = useMemo(() => {
     const lastMonthStart = startOfMonth(subMonths(currentMonth, 1));
     const lastMonthEnd = endOfMonth(subMonths(currentMonth, 1));
@@ -63,6 +68,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
   const diff = totalLastMonth > 0 ? ((totalCurrentMonth - totalLastMonth) / totalLastMonth) * 100 : 0;
   const budgetProgress = Math.min((totalCurrentMonth / budget) * 100, 100);
 
+  // LOGICA SALDI UNIFICATA (Ignora spese passate per i wallet)
   const balances = useMemo(() => {
     return wallets.map(w => {
       const totalIn = expenses
@@ -74,7 +80,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
         .reduce((sum, e) => sum + e.amount, 0);
       
       const totalOut = expenses
-        .filter(e => e.paymentMethod === w.method && !e.description.toLowerCase().includes('ricarica'))
+        .filter(e => {
+          const isWalletMethod = e.paymentMethod === w.method;
+          const isNotRefill = !e.description.toLowerCase().includes('ricarica');
+          const expenseDate = parseISO(e.date);
+          // Applichiamo la stessa regola: se la data è passata, non scali il saldo residuo
+          const isNotPast = !isBefore(expenseDate, today);
+          return isWalletMethod && isNotRefill && isNotPast;
+        })
         .reduce((sum, e) => sum + e.amount, 0);
       
       return {
@@ -84,15 +97,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
         color: w.icon === 'zap' ? 'text-emerald-500' : 'text-blue-500'
       };
     });
-  }, [expenses, wallets]);
+  }, [expenses, wallets, today]);
 
   const categoryData = useMemo(() => {
-    // Per il grafico a torta, includiamo TUTTE le spese reali del mese
-    // Escludiamo solo ricariche wallet e aggiustamenti saldo per non sporcare le categorie
     const realSpending = currentMonthExpenses.filter(e => {
       const desc = e.description.toLowerCase();
-      // Escludiamo le ricariche verso i wallet (perché sono solo spostamenti, non "consumi")
-      // e gli aggiustamenti manuali.
       const isInternal = desc.includes('aggiustamento') || 
                         wallets.some(w => desc === `ricarica ${w.name.toLowerCase()}`);
       return !isInternal;
@@ -171,7 +180,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
                 <div className={wallet.color}>{wallet.icon}</div>
                 <span className="text-[8px] font-bold text-gray-400 uppercase">{wallet.name}</span>
               </div>
-              <p className="font-bold dark:text-white">{currency}{wallet.value.toFixed(2)}</p>
+              <p className="font-bold dark:text-white">{currency}{wallet.value.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
             </div>
           ))}
         </div>

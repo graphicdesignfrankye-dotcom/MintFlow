@@ -2,8 +2,13 @@
 import React, { useMemo, useState } from 'react';
 import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2 } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
-import { format, isBefore, startOfToday, parseISO } from 'date-fns';
-import { it } from 'date-fns/locale';
+// Import date-fns functions directly from their modules to fix named export errors
+import format from 'date-fns/format';
+import isBefore from 'date-fns/isBefore';
+import startOfToday from 'date-fns/startOfToday';
+import parseISO from 'date-fns/parseISO';
+// Import locales directly from their modules for date-fns v2 compatibility
+import it from 'date-fns/locale/it';
 
 interface RicaricheViewProps {
   onRefill: (wallet: WalletConfig) => void;
