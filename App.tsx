@@ -294,6 +294,16 @@ const App: React.FC = () => {
     a.click();
   };
 
+  const handleDashboardAdjustment = () => {
+    setPrefill({
+      description: 'Aggiustamento',
+      category: 'Altro',
+      paymentMethod: PaymentMethod.Bancomat,
+      date: format(new Date(), 'yyyy-MM-dd')
+    });
+    setShowForm(true);
+  };
+
   if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center bg-mint-50"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   if (!session) return <Auth onSuccess={() => {}} />;
 
@@ -307,7 +317,18 @@ const App: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4">{successToast}</div>}
         
-        {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={currentBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} />}
+        {activeTab === 'dashboard' && (
+          <Dashboard 
+            expenses={expenses} 
+            budget={currentBudget} 
+            userName={userSettings.name} 
+            currency={userSettings.currency} 
+            wallets={userSettings.wallets} 
+            categories={userSettings.categories} 
+            lang={userSettings.language}
+            onAdjustment={handleDashboardAdjustment}
+          />
+        )}
         {activeTab === 'list' && (
           <div className="space-y-6">
             <div className="flex gap-3">
