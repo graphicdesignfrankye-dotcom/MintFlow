@@ -1,14 +1,8 @@
-
 import React, { useMemo, useState } from 'react';
-import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2 } from 'lucide-react';
+import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2, Banknote } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
-// Import date-fns functions directly from their modules to fix named export errors
-import format from 'date-fns/format';
-import isBefore from 'date-fns/isBefore';
-import startOfToday from 'date-fns/startOfToday';
-import parseISO from 'date-fns/parseISO';
-// Import locales directly from their modules for date-fns v2 compatibility
-import it from 'date-fns/locale/it';
+import { format, isBefore, startOfToday, parseISO } from 'date-fns';
+import { it } from 'date-fns/locale';
 
 interface RicaricheViewProps {
   onRefill: (wallet: WalletConfig) => void;
@@ -88,11 +82,17 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
     setIsSubmitting(true);
     try {
       const isPositive = diff > 0;
+      
+      // Logica intelligente per la fonte dell'aggiustamento:
+      // Se sto aggiungendo soldi ai contanti, la fonte è "Bancomat" (prelievo)
+      // Se sto aggiungendo a un wallet elettronico, la fonte è "Contanti" (versamento)
+      let sourceMethod = editingWallet.method === PaymentMethod.Contanti ? PaymentMethod.Bancomat : PaymentMethod.Contanti;
+      
       await onSaveExpense({
         description: `Aggiustamento ${editingWallet.name}`,
         amount: Math.abs(diff),
         category: 'Altro',
-        paymentMethod: isPositive ? PaymentMethod.Contanti : editingWallet.method,
+        paymentMethod: isPositive ? sourceMethod : editingWallet.method,
         date: format(new Date(), 'yyyy-MM-dd'),
         isSubscription: false
       });
@@ -102,6 +102,14 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getWalletIcon = (w: WalletConfig) => {
+    if (w.method === PaymentMethod.Contanti) return <Banknote size={20} />;
+    if (w.icon === 'zap') return <Zap size={20} />;
+    if (w.icon === 'fuel') return <Fuel size={20} />;
+    if (w.icon === 'credit-card') return <CreditCard size={20} />;
+    return <Wallet size={20} />;
   };
 
   return (
@@ -122,10 +130,10 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
             key={w.id}
             name={w.name} 
             balance={w.balance} 
-            icon={w.icon === 'zap' ? <Zap size={20} /> : w.icon === 'fuel' ? <Fuel size={20} /> : w.icon === 'credit-card' ? <CreditCard size={20} /> : <Wallet size={20} />} 
+            icon={getWalletIcon(w)} 
             onRefill={() => onRefill(w)} 
             onEdit={() => handleEditClick(w)}
-            color={w.icon === 'zap' ? 'emerald' : w.icon === 'fuel' ? 'orange' : w.icon === 'credit-card' ? 'purple' : 'blue'} 
+            color={w.method === PaymentMethod.Contanti ? 'emerald' : w.icon === 'zap' ? 'emerald' : w.icon === 'fuel' ? 'orange' : w.icon === 'credit-card' ? 'purple' : 'blue'} 
             currency={currency} 
           />
         ))}
@@ -168,7 +176,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
             
             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl mb-6 flex items-center gap-3">
               <div className="p-2 bg-white dark:bg-gray-700 rounded-xl text-emerald-500 shadow-sm">
-                {editingWallet.icon === 'zap' ? <Zap size={20} /> : editingWallet.icon === 'fuel' ? <Fuel size={20} /> : <CreditCard size={20} />}
+                {getWalletIcon(editingWallet)}
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Portafoglio</p>
@@ -228,7 +236,7 @@ const WalletCard = ({ name, balance, icon, onRefill, onEdit, color, currency }: 
         </div>
       </div>
       <button onClick={onRefill} className="mt-auto w-full flex items-center justify-center gap-1.5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-[10px] font-bold transition-all shadow-md active:scale-95">
-        <Plus size={14} /> RICARICA
+        <Plus size={14} /> {name.toUpperCase() === 'CONTANTI' ? 'PRELIEVO' : 'RICARICA'}
       </button>
     </div>
   );

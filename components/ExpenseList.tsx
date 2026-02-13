@@ -3,13 +3,11 @@ import React, { useState } from 'react';
 import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
   Trash2, Search, Filter, Edit2, AlertCircle, 
-  Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils
+  Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils,
+  CreditCard
 } from 'lucide-react';
-// Import date-fns functions directly from their modules to fix named export errors
-import format from 'date-fns/format';
-import isFuture from 'date-fns/isFuture';
-// Import locales directly from their modules for date-fns v2 compatibility
-import it from 'date-fns/locale/it';
+import { format, isFuture } from 'date-fns';
+import { it } from 'date-fns/locale';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -23,6 +21,7 @@ interface ExpenseListProps {
 export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit, currency = '€', wallets, categories }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('Tutti');
+  const [filterMethod, setFilterMethod] = useState<string>('Tutti');
 
   const filteredExpenses = expenses
     .filter(e => {
@@ -35,8 +34,11 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
       
       // FILTRO 3: Categoria
       const matchesCategory = filterCategory === 'Tutti' || e.category === filterCategory;
+
+      // FILTRO 4: Metodo di Pagamento
+      const matchesMethod = filterMethod === 'Tutti' || e.paymentMethod === filterMethod;
       
-      return matchesSearch && matchesCategory;
+      return matchesSearch && matchesCategory && matchesMethod;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -69,18 +71,38 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
             className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
           />
         </div>
-        <div className="relative">
-          <select 
-            value={filterCategory} 
-            onChange={(e) => setFilterCategory(e.target.value)} 
-            className="w-full md:w-auto px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white outline-none bg-white appearance-none cursor-pointer pr-10"
-          >
-            <option value="Tutti">Tutte le Categorie</option>
-            {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-            <Filter size={14} />
-          </div>
+        
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {/* Filtro Metodo Pagamento */}
+            <div className="relative min-w-[160px]">
+              <select 
+                value={filterMethod} 
+                onChange={(e) => setFilterMethod(e.target.value)} 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white outline-none bg-white appearance-none cursor-pointer pr-10 truncate text-sm font-medium"
+              >
+                <option value="Tutti">Metodo: Tutti</option>
+                <option value="Bancomat">Bancomat</option>
+                {wallets.map(w => <option key={w.id} value={w.method}>{w.name}</option>)}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <CreditCard size={14} />
+              </div>
+            </div>
+
+            {/* Filtro Categoria */}
+            <div className="relative min-w-[160px]">
+              <select 
+                value={filterCategory} 
+                onChange={(e) => setFilterCategory(e.target.value)} 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white outline-none bg-white appearance-none cursor-pointer pr-10 truncate text-sm font-medium"
+              >
+                <option value="Tutti">Cat: Tutte</option>
+                {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <Filter size={14} />
+              </div>
+            </div>
         </div>
       </div>
 
@@ -114,6 +136,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                         <span className={`whitespace-nowrap ${isDateInFuture ? "text-red-500" : ""}`}>{format(expenseDate, 'dd MMM yyyy', { locale: it })}</span>
                         <span>•</span>
                         <span className="text-emerald-600 dark:text-emerald-400 truncate">{expense.category}</span>
+                        <span>•</span>
+                        <span className="truncate">{expense.paymentMethod}</span>
                       </div>
                     </div>
                   </div>

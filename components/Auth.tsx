@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth } from '../services/supabase';
-import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle } from 'lucide-react';
+import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: () => void;
@@ -17,6 +17,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,13 +149,20 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-12 pr-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
+              className="w-full pl-12 pr-12 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
 
           <div className="flex items-center justify-between px-2">

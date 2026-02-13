@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Expense, PaymentMethod } from '../types';
+import { Expense, PaymentMethod, ProfileType } from '../types';
 
 const SUPABASE_URL = 'https://jpcweqcqysxgzycftzyv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
@@ -13,9 +13,10 @@ const PACK_SEP = ' |#| ';
 
 /**
  * Utility per impacchettare i dati in una stringa compatibile col DB
+ * Format: Desc |#| Method |#| IsSub |#| Profile
  */
-const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean) => {
-  return `${desc}${PACK_SEP}${pm}${PACK_SEP}${isSub}`;
+const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean, profile: ProfileType) => {
+  return `${desc}${PACK_SEP}${pm}${PACK_SEP}${isSub}${PACK_SEP}${profile}`;
 };
 
 /**
@@ -23,13 +24,14 @@ const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean) => {
  */
 const unpackDescription = (packedStr: string) => {
   if (!packedStr || !packedStr.includes(PACK_SEP)) {
-    return { desc: packedStr, pm: PaymentMethod.Contanti, isSub: false };
+    return { desc: packedStr, pm: PaymentMethod.Contanti, isSub: false, profile: 'personal' as ProfileType };
   }
   const parts = packedStr.split(PACK_SEP);
   return {
     desc: parts[0],
     pm: (parts[1] as PaymentMethod) || PaymentMethod.Contanti,
-    isSub: parts[2] === 'true'
+    isSub: parts[2] === 'true',
+    profile: (parts[3] as ProfileType) || 'personal'
   };
 };
 
@@ -99,7 +101,8 @@ export const db = {
         date: e.date,
         description: unpacked.desc,
         paymentMethod: unpacked.pm,
-        isSubscription: unpacked.isSub
+        isSubscription: unpacked.isSub,
+        profile: unpacked.profile
       };
     });
   },
@@ -107,11 +110,12 @@ export const db = {
   async addExpense(expense: Omit<Expense, 'id'>, userId: string): Promise<Expense> {
     console.log("Tentativo salvataggio su Supabase:", expense);
 
-    // Impacchettiamo descrizione, metodo e abbonamento in un'unica stringa
+    // Impacchettiamo descrizione, metodo, abbonamento e profilo
     const packedDesc = packDescription(
       expense.description, 
       expense.paymentMethod, 
-      !!expense.isSubscription
+      !!expense.isSubscription,
+      expense.profile || 'personal'
     );
 
     const insertData: any = {
@@ -122,15 +126,12 @@ export const db = {
       user_id: userId
     };
 
-    // Inviamo solo le colonne che sappiamo esistere con certezza
     const { data, error } = await supabase.from('expenses').insert([insertData]).select().single();
     
     if (error) {
       console.error("Errore Supabase durante insert:", error);
       throw error;
     }
-    
-    console.log("Salvataggio riuscito:", data);
     
     return {
       id: data.id,
@@ -139,21 +140,22 @@ export const db = {
       category: data.category,
       paymentMethod: expense.paymentMethod,
       date: data.date,
-      isSubscription: expense.isSubscription
+      isSubscription: expense.isSubscription,
+      profile: expense.profile || 'personal'
     };
   },
 
   async updateExpense(id: string, expense: Partial<Omit<Expense, 'id'>>): Promise<Expense> {
-    // Per l'aggiornamento dobbiamo prima recuperare lo stato attuale se mancano pezzi
     const { data: current } = await supabase.from('expenses').select('description').eq('id', id).single();
     const currentUnpacked = unpackDescription(current?.description || '');
 
     const newDesc = expense.description !== undefined ? expense.description : currentUnpacked.desc;
     const newPM = expense.paymentMethod !== undefined ? expense.paymentMethod : currentUnpacked.pm;
     const newIsSub = expense.isSubscription !== undefined ? expense.isSubscription : currentUnpacked.isSub;
+    const newProfile = expense.profile !== undefined ? expense.profile : currentUnpacked.profile;
 
     const updateData: any = {
-      description: packDescription(newDesc, newPM, newIsSub)
+      description: packDescription(newDesc, newPM, newIsSub, newProfile)
     };
 
     if (expense.amount !== undefined) updateData.amount = expense.amount;
@@ -170,7 +172,8 @@ export const db = {
       date: data.date,
       description: newDesc,
       paymentMethod: newPM,
-      isSubscription: newIsSub
+      isSubscription: newIsSub,
+      profile: newProfile
     };
   },
 

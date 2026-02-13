@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
@@ -10,22 +10,15 @@ import { SettingsView } from './components/SettingsView';
 import { RicaricheView } from './components/RicaricheView';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { Auth } from './components/Auth';
-import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig } from './types';
+import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig, ProfileType } from './types';
 import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
-// Import date-fns functions directly from their modules to fix named export errors
-import startOfMonth from 'date-fns/startOfMonth';
-import format from 'date-fns/format';
-import isSameMonth from 'date-fns/isSameMonth';
-import parseISO from 'date-fns/parseISO';
-import isAfter from 'date-fns/isAfter';
-import endOfMonth from 'date-fns/endOfMonth';
-import getDate from 'date-fns/getDate';
+import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth, getDate } from 'date-fns';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([]); // Tutte le spese
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -36,8 +29,9 @@ const App: React.FC = () => {
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('mintflow_user_settings');
     const defaultWallets: WalletConfig[] = [
+      { id: 'w0', name: 'Contanti', method: PaymentMethod.Contanti, icon: 'wallet' },
       { id: 'w1', name: 'Prepagata Flash', method: PaymentMethod.Flash, icon: 'zap' },
-      { id: 'w2', name: 'Prepagata Revolut', method: PaymentMethod.Revolut, icon: 'wallet' },
+      { id: 'w2', name: 'Prepagata Revolut', method: PaymentMethod.Revolut, icon: 'credit-card' },
       { id: 'w3', name: 'App Q8', method: PaymentMethod.AppQ8, icon: 'fuel' }
     ];
 
@@ -55,22 +49,45 @@ const App: React.FC = () => {
     const defaultSettings: UserSettings = {
       name: 'Utente',
       monthlyBudget: 1000,
+      jointBudget: 1500, // Default per cointestato
       currency: '€',
       isDarkMode: false,
       wallets: defaultWallets,
       categories: defaultCategories,
-      language: 'it'
+      language: 'it',
+      currentProfile: 'personal'
     };
 
     if (!saved) return defaultSettings;
     
     try {
       const parsed = JSON.parse(saved);
-      return { ...defaultSettings, ...parsed };
+      // Ensure jointBudget and currentProfile exist for old saved data
+      const merged = { 
+        ...defaultSettings, 
+        ...parsed,
+        currentProfile: 'personal', // Force personal profile
+        jointBudget: parsed.jointBudget || defaultSettings.jointBudget
+      };
+      
+      // Assicuriamoci che il wallet contanti sia presente se non c'è
+      if (!merged.wallets.some(w => w.method === PaymentMethod.Contanti)) {
+          merged.wallets = [defaultWallets[0], ...merged.wallets];
+      }
+      
+      return merged;
     } catch {
       return defaultSettings;
     }
   });
+
+  // Filtra spese in base al profilo attivo (ora solo personal)
+  const expenses = useMemo(() => {
+    return allExpenses.filter(e => (e.profile || 'personal') === 'personal');
+  }, [allExpenses]);
+
+  // Budget attuale (solo personale)
+  const currentBudget = userSettings.monthlyBudget;
 
   // Salva le impostazioni ogni volta che cambiano
   useEffect(() => {
@@ -85,13 +102,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (session && !isInitialLoading) {
       const today = new Date();
-      const isFirstDay = getDate(today) === 1;
-      const lastUpdate = userSettings.lastBudgetUpdate ? parseISO(userSettings.lastBudgetUpdate) : null;
+      const lastUpdateStr = userSettings.lastBudgetUpdate;
+      const lastUpdate = lastUpdateStr ? parseISO(lastUpdateStr) : null;
       
       // Mostra il prompt se:
-      // 1. È un nuovo utente (nessun lastUpdate)
-      // 2. È il primo del mese e l'ultimo aggiornamento non è di questo mese
-      if (!lastUpdate || (isFirstDay && !isSameMonth(lastUpdate, today))) {
+      // 1. Mai impostato (nuovo utente)
+      // 2. L'ultimo aggiornamento è di un mese precedente a quello attuale
+      if (!lastUpdate || !isSameMonth(lastUpdate, today)) {
         setShowBudgetPrompt(true);
       }
     }
@@ -120,7 +137,7 @@ const App: React.FC = () => {
     try {
       setIsLoading(true);
       const data = await db.getExpenses(session.user.id);
-      setExpenses(data);
+      setAllExpenses(data);
     } catch (err) {
       console.error("Errore caricamento:", err);
     } finally {
@@ -137,13 +154,25 @@ const App: React.FC = () => {
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id'>) => {
     try {
       setIsSyncing(true);
+      
+      // Assicura che la spesa sia associata al profilo corrente (sempre personal)
+      const dataToSave = {
+        ...expenseData,
+        profile: 'personal' as ProfileType
+      };
+
       let savedExpense: Expense | null = null;
+      
       if (prefill?.id) {
-        savedExpense = await db.updateExpense(prefill.id, expenseData);
-        if (savedExpense) setExpenses(prev => prev.map(e => e.id === savedExpense!.id ? savedExpense! : e));
+        savedExpense = await db.updateExpense(prefill.id, dataToSave);
+        if (savedExpense) {
+            setAllExpenses(prev => prev.map(e => e.id === savedExpense!.id ? savedExpense! : e));
+        }
       } else {
-        savedExpense = await db.addExpense(expenseData, session.user.id);
-        if (savedExpense) setExpenses(prev => [savedExpense!, ...prev]);
+        savedExpense = await db.addExpense(dataToSave, session.user.id);
+        if (savedExpense) {
+            setAllExpenses(prev => [savedExpense!, ...prev]);
+        }
       }
       setShowForm(false);
       setPrefill(null);
@@ -157,11 +186,14 @@ const App: React.FC = () => {
   };
 
   const handleSetMonthlyBudget = (amount: number) => {
+    const now = new Date().toISOString();
+    
     setUserSettings(prev => ({
-      ...prev,
-      monthlyBudget: amount,
-      lastBudgetUpdate: new Date().toISOString()
+        ...prev,
+        monthlyBudget: amount,
+        lastBudgetUpdate: now
     }));
+    
     setShowBudgetPrompt(false);
     setSuccessToast("Budget impostato con successo!");
     setTimeout(() => setSuccessToast(null), 3000);
@@ -221,7 +253,7 @@ const App: React.FC = () => {
           }
 
           // Duplicate check
-          const isDuplicate = expenses.some(e => e.date === date && Math.abs(e.amount - amount) < 0.01 && e.description === rawDesc);
+          const isDuplicate = allExpenses.some(e => e.date === date && Math.abs(e.amount - amount) < 0.01 && e.description === rawDesc);
           if (isDuplicate) {
             skippedCount++;
             continue;
@@ -233,7 +265,8 @@ const App: React.FC = () => {
             amount,
             category: category,
             paymentMethod: PaymentMethod.Contanti,
-            isSubscription: false
+            isSubscription: false,
+            profile: 'personal'
           }, session.user.id);
           
           importedCount++;
@@ -257,7 +290,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `spese_${format(new Date(), 'yyyyMMdd')}.csv`;
+    a.download = `spese_personali_${format(new Date(), 'yyyyMMdd')}.csv`;
     a.click();
   };
 
@@ -265,11 +298,16 @@ const App: React.FC = () => {
   if (!session) return <Auth onSuccess={() => {}} />;
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
+    <Layout 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        lang={userSettings.language}
+        currentProfile={userSettings.currentProfile}
+    >
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4">{successToast}</div>}
         
-        {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={userSettings.monthlyBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} />}
+        {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={currentBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} />}
         {activeTab === 'list' && (
           <div className="space-y-6">
             <div className="flex gap-3">
@@ -278,14 +316,18 @@ const App: React.FC = () => {
             <ExpenseList expenses={expenses} onDelete={id => setExpenseToDelete(id)} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
           </div>
         )}
-        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
+        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { 
+            const sourceMethod = w.method === PaymentMethod.Contanti ? PaymentMethod.Bancomat : PaymentMethod.Contanti;
+            setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: sourceMethod, date: format(new Date(), 'yyyy-MM-dd') }); 
+            setShowForm(true); 
+        }} onSaveExpense={handleSaveExpense} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
         {activeTab === 'ai' && <AiInsights expenses={expenses} />}
         {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session.user.email} />}
         {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
 
         {showForm && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative">
+            <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-md p-8 shadow-2xl relative">
               <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">✕</button>
               <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white">{prefill?.id ? 'Modifica' : 'Nuova Spesa'}</h2>
               <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
@@ -296,7 +338,7 @@ const App: React.FC = () => {
         {showBudgetPrompt && (
           <BudgetPromptModal 
             onConfirm={handleSetMonthlyBudget} 
-            initialValue={userSettings.monthlyBudget} 
+            initialValue={currentBudget} 
             currency={userSettings.currency}
             isNewUser={!userSettings.lastBudgetUpdate}
           />
@@ -308,7 +350,7 @@ const App: React.FC = () => {
               <div className="bg-red-100 text-red-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={32} /></div>
               <h3 className="text-xl font-bold mb-2">Elimina?</h3>
               <div className="flex flex-col gap-3 mt-6">
-                <button onClick={async () => { await db.deleteExpense(expenseToDelete); setExpenses(prev => prev.filter(e => e.id !== expenseToDelete)); setExpenseToDelete(null); }} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold">Elimina</button>
+                <button onClick={async () => { await db.deleteExpense(expenseToDelete); setAllExpenses(prev => prev.filter(e => e.id !== expenseToDelete)); setExpenseToDelete(null); }} className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold">Elimina</button>
                 <button onClick={() => setExpenseToDelete(null)} className="w-full py-3 text-gray-400 font-bold">Annulla</button>
               </div>
             </div>
@@ -336,16 +378,17 @@ const BudgetPromptModal: React.FC<{
         </div>
         
         <h2 className="text-3xl font-black text-gray-900 dark:text-white text-center mb-2">
-          {isNewUser ? 'Benvenuto su MintFlow!' : 'Nuovo Mese!'}
+          {isNewUser ? 'Benvenuto!' : 'Nuovo Mese!'}
         </h2>
+        
         <p className="text-gray-500 dark:text-gray-400 text-center mb-8 font-medium">
           {isNewUser 
-            ? 'Iniziamo impostando il tuo budget mensile di riferimento.' 
-            : 'È il momento di pianificare le spese per questo nuovo mese.'}
+            ? `Imposta il budget personale di partenza.` 
+            : 'Pianifica le tue finanze per questo mese.'}
         </p>
 
         <div className="mb-8">
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3 ml-2 text-center">Il tuo budget target</label>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3 ml-2 text-center">Budget Target</label>
           <div className="relative">
              <input 
               autoFocus

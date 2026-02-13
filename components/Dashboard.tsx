@@ -1,23 +1,11 @@
-
 import React, { useMemo } from 'react';
 import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
-// Import date-fns functions directly from their modules to fix named export errors
-import format from 'date-fns/format';
-import startOfMonth from 'date-fns/startOfMonth';
-import endOfMonth from 'date-fns/endOfMonth';
-import isWithinInterval from 'date-fns/isWithinInterval';
-import subMonths from 'date-fns/subMonths';
-import isAfter from 'date-fns/isAfter';
-import startOfToday from 'date-fns/startOfToday';
-import isBefore from 'date-fns/isBefore';
-import parseISO from 'date-fns/parseISO';
-// Import locales directly from their modules for date-fns v2 compatibility
-import it from 'date-fns/locale/it';
-import enUS from 'date-fns/locale/en-US';
+import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter, startOfToday, isBefore, parseISO } from 'date-fns';
+import { it, enUS } from 'date-fns/locale';
 import { translations } from '../utils/i18n';
 
 interface DashboardProps {

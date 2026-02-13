@@ -3,12 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CategoryConfig, Expense, PaymentMethod, WalletConfig } from '../types';
 import { SmartCategorizer } from './SmartCategorizer';
 import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap, Copy } from 'lucide-react';
-// Import date-fns functions directly from their modules to fix named export errors
-import isSameMonth from 'date-fns/isSameMonth';
-import isAfter from 'date-fns/isAfter';
-import startOfMonth from 'date-fns/startOfMonth';
-import parseISO from 'date-fns/parseISO';
-import startOfToday from 'date-fns/startOfToday';
+import { isSameMonth, isAfter, startOfMonth, parseISO, startOfToday } from 'date-fns';
 
 interface ExpenseFormProps {
   onSubmit: (expense: Omit<Expense, 'id'>) => Promise<void> | void;
@@ -173,7 +168,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Metodo di Pagamento</label>
           <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
-            {[PaymentMethod.Contanti, PaymentMethod.Bancomat, ...wallets.map(w => w.method)].map((m) => (
+            {[PaymentMethod.Bancomat, ...wallets.map(w => w.method)].map((m) => (
               <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex items-center gap-2 px-3 py-3 rounded-xl text-[10px] font-bold border-2 transition-all ${paymentMethod === m ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-emerald-50 dark:border-gray-700 text-gray-500'}`}>
                 {getPaymentIcon(m)} <span className="truncate">{wallets.find(w => w.method === m)?.name || m}</span>
               </button>

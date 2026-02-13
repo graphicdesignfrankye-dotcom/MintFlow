@@ -1,16 +1,18 @@
 
 import React from 'react';
-import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat } from 'lucide-react';
+import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat, User, Users } from 'lucide-react';
 import { translations } from '../utils/i18n';
+import { ProfileType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions';
   setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions') => void;
   lang?: 'it' | 'en';
+  currentProfile?: ProfileType;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it' }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it', currentProfile = 'personal' }) => {
   const t = translations[lang].nav;
 
   return (
@@ -22,10 +24,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
               <PiggyBank className="text-emerald-600 dark:text-emerald-400" size={24} />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent hidden sm:inline-block">
               MintFlow
             </span>
           </div>
+
           <div className="hidden md:flex items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
             <NavButton 
               active={activeTab === 'dashboard'} 
@@ -70,7 +73,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       <main>{children}</main>
 
       {/* Bottom Nav for Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-2 flex items-center justify-around pb-4 transition-colors">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-2 flex items-center justify-around pb-4 transition-colors z-50">
         <MobileNavButton 
           active={activeTab === 'dashboard'} 
           onClick={() => setActiveTab('dashboard')}

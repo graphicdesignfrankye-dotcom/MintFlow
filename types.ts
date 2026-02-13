@@ -17,14 +17,17 @@ export interface CategoryConfig {
   color?: string;
 }
 
+export type ProfileType = 'personal' | 'joint';
+
 export interface Expense {
   id: string;
   description: string;
   amount: number;
-  category: string; // Ora è una stringa dinamica
+  category: string;
   paymentMethod: PaymentMethod;
   date: string;
   isSubscription?: boolean;
+  profile?: ProfileType; // Nuovo campo per distinguere il profilo
 }
 
 export interface WalletConfig {
@@ -36,13 +39,16 @@ export interface WalletConfig {
 
 export interface UserSettings {
   name: string;
-  monthlyBudget: number;
+  monthlyBudget: number; // Budget Personale
+  jointBudget?: number;  // Budget Cointestato
   currency: string;
   isDarkMode: boolean;
   wallets: WalletConfig[];
   categories: CategoryConfig[];
   language: 'it' | 'en';
-  lastBudgetUpdate?: string; // Data dell'ultima volta che il budget è stato confermato
+  lastBudgetUpdate?: string; // Data update personale
+  lastJointBudgetUpdate?: string; // Data update cointestato
+  currentProfile: ProfileType; // Profilo attualmente selezionato
 }
 
 export interface AiInsight {
