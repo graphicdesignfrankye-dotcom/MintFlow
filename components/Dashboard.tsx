@@ -1,10 +1,11 @@
+
 import React, { useMemo } from 'react';
 import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer 
 } from 'recharts';
-import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter, startOfToday, isBefore, parseISO } from 'date-fns';
+import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown, SlidersHorizontal } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, isAfter, startOfToday, isBefore, parseISO, isSameMonth } from 'date-fns';
 import { it, enUS } from 'date-fns/locale';
 import { translations } from '../utils/i18n';
 
@@ -16,47 +17,59 @@ interface DashboardProps {
   wallets: WalletConfig[];
   categories: CategoryConfig[];
   lang?: 'it' | 'en';
+  onAdjustment?: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName = 'Utente', currency = '€', wallets, categories, lang = 'it' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  expenses, 
+  budget, 
+  userName = 'Utente', 
+  currency = '€', 
+  wallets, 
+  categories, 
+  lang = 'it',
+  onAdjustment
+}) => {
   const t = translations[lang].dashboard;
-  const currentMonth = new Date();
-  const currentMonthStart = startOfMonth(currentMonth);
-  const currentMonthEnd = endOfMonth(currentMonth);
   const today = startOfToday();
+  const currentMonthDate = new Date();
 
+  // Filtro spese del mese corrente
   const currentMonthExpenses = useMemo(() => {
-    return expenses.filter(e => 
-      isWithinInterval(new Date(e.date), { start: currentMonthStart, end: currentMonthEnd })
-    );
-  }, [expenses, currentMonthStart, currentMonthEnd]);
-
-  // FUNZIONE HELPER PER FILTRARE SPESE REALI PER IL BUDGET
-  const filterBudgetExpenses = (expenseList: Expense[]) => {
-    return expenseList.filter(e => {
-      const desc = e.description.toLowerCase();
-      const isAdjustment = desc.includes('aggiustamento');
-      return !isAdjustment && (e.paymentMethod === PaymentMethod.Contanti || e.paymentMethod === PaymentMethod.Bancomat);
+    return expenses.filter(e => {
+      const expenseDate = parseISO(e.date);
+      return isSameMonth(expenseDate, currentMonthDate);
     });
-  };
+  }, [expenses, currentMonthDate]);
 
+  // CALCOLO TOTALE "CASH FLOW" (Uscite dal conto principale)
+  // Per ottenere il valore corretto (es. 1664,99€), sommiamo solo le transazioni Bancomat.
+  // Questo include: Spese dirette + Ricariche verso wallet.
   const totalCurrentMonth = useMemo(() => {
-    return filterBudgetExpenses(currentMonthExpenses).reduce((sum, e) => sum + e.amount, 0);
+    return currentMonthExpenses
+      .filter(e => 
+        e.paymentMethod === PaymentMethod.Bancomat && 
+        !e.description.toLowerCase().includes('aggiustamento tecnico')
+      )
+      .reduce((sum, e) => sum + e.amount, 0);
   }, [currentMonthExpenses]);
 
+  // Totale mese scorso con la stessa logica
   const totalLastMonth = useMemo(() => {
-    const lastMonthStart = startOfMonth(subMonths(currentMonth, 1));
-    const lastMonthEnd = endOfMonth(subMonths(currentMonth, 1));
-    const lastMonthExpenses = expenses.filter(e => 
-      isWithinInterval(new Date(e.date), { start: lastMonthStart, end: lastMonthEnd })
-    );
-    return filterBudgetExpenses(lastMonthExpenses).reduce((sum, e) => sum + e.amount, 0);
-  }, [expenses]);
+    const lastMonthDate = subMonths(currentMonthDate, 1);
+    const lastMonthExpenses = expenses.filter(e => isSameMonth(parseISO(e.date), lastMonthDate));
+    return lastMonthExpenses
+      .filter(e => 
+        e.paymentMethod === PaymentMethod.Bancomat && 
+        !e.description.toLowerCase().includes('aggiustamento tecnico')
+      )
+      .reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses, currentMonthDate]);
 
   const diff = totalLastMonth > 0 ? ((totalCurrentMonth - totalLastMonth) / totalLastMonth) * 100 : 0;
   const budgetProgress = Math.min((totalCurrentMonth / budget) * 100, 100);
 
-  // LOGICA SALDI UNIFICATA (Ignora spese passate per i wallet)
+  // LOGICA SALDI WALLET
   const balances = useMemo(() => {
     return wallets.map(w => {
       const totalIn = expenses
@@ -72,7 +85,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
           const isWalletMethod = e.paymentMethod === w.method;
           const isNotRefill = !e.description.toLowerCase().includes('ricarica');
           const expenseDate = parseISO(e.date);
-          // Applichiamo la stessa regola: se la data è passata, non scali il saldo residuo
           const isNotPast = !isBefore(expenseDate, today);
           return isWalletMethod && isNotRefill && isNotPast;
         })
@@ -87,14 +99,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
     });
   }, [expenses, wallets, today]);
 
+  // DATI GRAFICO CATEGORIE
   const categoryData = useMemo(() => {
-    const realSpending = currentMonthExpenses.filter(e => {
-      const desc = e.description.toLowerCase();
-      const isInternal = desc.includes('aggiustamento') || 
-                        wallets.some(w => desc === `ricarica ${w.name.toLowerCase()}`);
-      return !isInternal;
-    });
-
+    const realSpending = currentMonthExpenses.filter(e => 
+      !e.description.toLowerCase().includes('ricarica') && 
+      !e.description.toLowerCase().includes('aggiustamento')
+    );
+    
     const data: Record<string, number> = {};
     realSpending.forEach(e => {
       data[e.category] = (data[e.category] || 0) + e.amount;
@@ -103,7 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
       .map(([name, value]) => ({ name, value }))
       .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [currentMonthExpenses, wallets]);
+  }, [currentMonthExpenses]);
 
   const getCategoryColor = (catName: string) => categories.find(c => c.name === catName)?.color || '#9ca3af';
   const formatValue = (val: number) => `${currency}${val.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
@@ -119,11 +130,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2 bg-emerald-500 p-8 rounded-[2rem] text-white shadow-xl shadow-emerald-200/50 relative overflow-hidden">
           <div className="flex justify-between items-start mb-6">
-            <div>
+            <div className="flex-1">
               <p className="text-emerald-50 text-xs font-bold uppercase tracking-wider mb-1">{t.spentThisMonth}</p>
-              <h2 className="text-4xl font-black">{formatValue(totalCurrentMonth)}</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-4xl font-black">{formatValue(totalCurrentMonth)}</h2>
+                <button 
+                  onClick={onAdjustment}
+                  className="bg-white/20 hover:bg-white/30 p-2 rounded-xl backdrop-blur-sm transition-colors group flex items-center gap-2"
+                  title="Aggiungi aggiustamento"
+                >
+                  <SlidersHorizontal size={18} className="text-white" />
+                  <span className="text-[10px] font-bold uppercase hidden sm:inline">Aggiustamenti</span>
+                </button>
+              </div>
+              <p className="text-emerald-100 text-[10px] mt-1 font-medium">(Uscite Bancomat & Ricariche)</p>
             </div>
-            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm"><CreditCard size={24} /></div>
+            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm shrink-0"><CreditCard size={24} /></div>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-emerald-50">
@@ -153,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
             <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl"><Calendar size={20} /></div>
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-widest">{t.month}</p>
-              <p className="font-black text-lg dark:text-white capitalize">{format(currentMonth, "MMMM", { locale: dateLocale })}</p>
+              <p className="font-black text-lg dark:text-white capitalize">{format(currentMonthDate, "MMMM", { locale: dateLocale })}</p>
             </div>
           </div>
         </div>
@@ -176,7 +198,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold dark:text-white mb-6">Analisi Categorie</h3>
+          <div className="flex justify-between items-center mb-6">
+             <h3 className="text-lg font-bold dark:text-white">Analisi Categorie</h3>
+             <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded-lg">Consumo Reale</span>
+          </div>
           <div className="w-full h-[250px]">
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -186,7 +211,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
                       <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value: number) => [`${currency}${value.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 'Importo']} />
                 </PieChart>
               </ResponsiveContainer>
             ) : <div className="h-full flex items-center justify-center text-gray-400">Nessuna spesa rilevante</div>}
@@ -194,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold dark:text-white mb-6">Spese Maggiori</h3>
+          <h3 className="text-lg font-bold dark:text-white mb-6">Top Spese (No Ricariche)</h3>
           <div className="space-y-4">
             {categoryData.slice(0, 5).map((entry) => (
               <div key={entry.name} className="flex items-center justify-between">
@@ -205,6 +230,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ expenses, budget, userName
                 <span className="text-sm font-bold dark:text-white">{formatValue(entry.value)}</span>
               </div>
             ))}
+            {categoryData.length === 0 && <p className="text-gray-400 text-sm">Nessuna spesa da mostrare.</p>}
           </div>
         </div>
       </div>
