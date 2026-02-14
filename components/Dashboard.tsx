@@ -43,8 +43,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [expenses, currentMonthDate]);
 
   // CALCOLO TOTALE "CASH FLOW" (Uscite dal conto principale)
-  // Per ottenere il valore corretto (es. 1664,99€), sommiamo solo le transazioni Bancomat.
-  // Questo include: Spese dirette + Ricariche verso wallet.
   const totalCurrentMonth = useMemo(() => {
     return currentMonthExpenses
       .filter(e => 
@@ -102,7 +100,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // DATI GRAFICO CATEGORIE
   const categoryData = useMemo(() => {
     const realSpending = currentMonthExpenses.filter(e => 
-      !e.description.toLowerCase().includes('ricarica') && 
       !e.description.toLowerCase().includes('aggiustamento')
     );
     
@@ -219,7 +216,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold dark:text-white mb-6">Top Spese (No Ricariche)</h3>
+          <h3 className="text-lg font-bold dark:text-white mb-6">Top Spese</h3>
           <div className="space-y-4">
             {categoryData.slice(0, 5).map((entry) => (
               <div key={entry.name} className="flex items-center justify-between">

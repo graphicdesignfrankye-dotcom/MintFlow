@@ -24,7 +24,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
               <PiggyBank className="text-emerald-600 dark:text-emerald-400" size={24} />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent hidden sm:inline-block">
+            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
               MintFlow
             </span>
           </div>
