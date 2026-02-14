@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { UserSettings, Expense, WalletConfig, CategoryConfig, PaymentMethod } from '../types';
-import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check, Upload, Loader2 } from 'lucide-react';
+import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check, Upload, Loader2, Eraser } from 'lucide-react';
 import { auth } from '../services/supabase';
 import { format } from 'date-fns';
 import { HistoryView } from './HistoryView';
@@ -33,6 +33,7 @@ interface SettingsViewProps {
   settings: UserSettings;
   onUpdate: (settings: UserSettings) => void;
   onClearData: () => void;
+  onDeleteAdjustments?: () => void;
   onImport?: (file: File) => Promise<{ imported: number; skipped: number; errors: string[], debugInfo: string }>;
   onExport?: () => void;
   expenses: Expense[];
@@ -43,6 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   settings, 
   onUpdate, 
   onClearData,
+  onDeleteAdjustments,
   onImport,
   onExport,
   expenses,
@@ -171,9 +173,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // LOG DI DEBUG
-    console.log("Evento file change:", file);
-
+    
     if (!file) {
       return;
     }
@@ -189,12 +189,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
-
-    // Conferma immediata per capire se siamo arrivati qui
-    // if (!window.confirm(`File rilevato: ${file.name}. Procedere con l'analisi?`)) {
-    //   if (fileInputRef.current) fileInputRef.current.value = '';
-    //   return;
-    // }
 
     setIsImporting(true);
     try {
@@ -467,6 +461,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             />
           </button>
         </div>
+        
+        {onDeleteAdjustments && (
+          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+            <button 
+              type="button" 
+              onClick={onDeleteAdjustments} 
+              className="w-full flex items-center justify-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider hover:text-red-600 transition-all p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <Eraser size={16} /> Elimina vecchi "Aggiustamenti"
+            </button>
+            <p className="text-[10px] text-center text-gray-400 mt-2">Usa questo per rimuovere i vecchi dati prima del cambio nome in "Modifica".</p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-red-50 dark:border-red-900/10 shadow-sm">

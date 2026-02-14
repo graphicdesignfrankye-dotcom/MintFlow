@@ -9,11 +9,12 @@ import { ReceiptScanner } from './components/ReceiptScanner';
 import { SettingsView } from './components/SettingsView';
 import { RicaricheView } from './components/RicaricheView';
 import { SubscriptionsView } from './components/SubscriptionsView';
+import { ExtraView } from './components/ExtraView';
 import { Auth } from './components/Auth';
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig, ProfileType } from './types';
 import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
-import { startOfMonth, format, isSameMonth, parseISO, isAfter, endOfMonth, getDate } from 'date-fns';
+import { format, isSameMonth } from 'date-fns';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -55,7 +56,9 @@ const App: React.FC = () => {
       wallets: defaultWallets,
       categories: defaultCategories,
       language: 'it',
-      currentProfile: 'personal'
+      currentProfile: 'personal',
+      monthlyOffset: 0,
+      lastOffsetDate: new Date().toISOString()
     };
 
     if (!saved) return defaultSettings;
@@ -73,6 +76,16 @@ const App: React.FC = () => {
           merged.wallets = [defaultWallets[0], ...merged.wallets];
       }
       
+      // LOGICA RESET MENSILE OFFSET
+      const now = new Date();
+      const lastOffsetDate = merged.lastOffsetDate ? new Date(merged.lastOffsetDate) : null;
+      
+      // Se non c'è una data o se la data è di un mese diverso da oggi, resetta l'offset a 0
+      if (!lastOffsetDate || !isSameMonth(lastOffsetDate, now)) {
+        merged.monthlyOffset = 0;
+        merged.lastOffsetDate = now.toISOString();
+      }
+
       return merged;
     } catch {
       return defaultSettings;
@@ -88,9 +101,14 @@ const App: React.FC = () => {
     }
   }, [userSettings.isDarkMode]);
 
-  // Filtra spese in base al profilo attivo (ora solo personal)
+  // Filtra spese in base al profilo attivo (ora solo personal) E RIMUOVE GLI EXTRA dalla Dashboard
   const expenses = useMemo(() => {
-    return allExpenses.filter(e => (e.profile || 'personal') === 'personal');
+    return allExpenses.filter(e => (e.profile || 'personal') === 'personal' && !e.isExtra);
+  }, [allExpenses]);
+
+  // Filtra SOLO le spese EXTRA
+  const extraExpenses = useMemo(() => {
+    return allExpenses.filter(e => (e.profile || 'personal') === 'personal' && e.isExtra);
   }, [allExpenses]);
 
   // Budget attuale (solo personale)
@@ -101,7 +119,7 @@ const App: React.FC = () => {
     localStorage.setItem('mintflow_user_settings', JSON.stringify(userSettings));
   }, [userSettings]);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings' | 'subscriptions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings' | 'subscriptions' | 'extra'>('dashboard');
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
 
@@ -110,7 +128,8 @@ const App: React.FC = () => {
     if (session && !isInitialLoading) {
       const today = new Date();
       const lastUpdateStr = userSettings.lastBudgetUpdate;
-      const lastUpdate = lastUpdateStr ? parseISO(lastUpdateStr) : null;
+      // Replaced parseISO with new Date
+      const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : null;
       
       if (!lastUpdate || !isSameMonth(lastUpdate, today)) {
         setShowBudgetPrompt(true);
@@ -199,6 +218,28 @@ const App: React.FC = () => {
     setShowBudgetPrompt(false);
     setSuccessToast("Budget impostato con successo!");
     setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  const handleDeleteAdjustments = async () => {
+    if (!session?.user?.id) return;
+    if (!window.confirm("Sei sicuro? Questo eliminerà definitivamente tutte le spese che contengono 'Aggiustamento' nel nome.")) return;
+    
+    try {
+      setIsSyncing(true);
+      const adjustments = allExpenses.filter(e => e.description.toLowerCase().includes('aggiustamento'));
+      
+      for (const adj of adjustments) {
+        await db.deleteExpense(adj.id);
+      }
+      
+      setAllExpenses(prev => prev.filter(e => !e.description.toLowerCase().includes('aggiustamento')));
+      setSuccessToast("Aggiustamenti eliminati!");
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (err: any) {
+      alert("Errore durante l'eliminazione: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleImportCSV = async (file: File): Promise<{ imported: number, skipped: number, errors: string[], debugInfo: string }> => {
@@ -293,14 +334,8 @@ const App: React.FC = () => {
     a.click();
   };
 
-  const handleDashboardAdjustment = () => {
-    setPrefill({
-      description: 'Aggiustamento',
-      category: 'Altro',
-      paymentMethod: PaymentMethod.Bancomat,
-      date: format(new Date(), 'yyyy-MM-dd')
-    });
-    setShowForm(true);
+  const handleUpdateWallets = (newWallets: WalletConfig[]) => {
+    setUserSettings(prev => ({ ...prev, wallets: newWallets }));
   };
 
   if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center bg-mint-50"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
@@ -325,7 +360,8 @@ const App: React.FC = () => {
             wallets={userSettings.wallets} 
             categories={userSettings.categories} 
             lang={userSettings.language}
-            onAdjustment={handleDashboardAdjustment}
+            userSettings={userSettings}
+            onUpdateSettings={setUserSettings}
           />
         )}
         {activeTab === 'list' && (
@@ -336,14 +372,24 @@ const App: React.FC = () => {
             <ExpenseList expenses={expenses} onDelete={id => setExpenseToDelete(id)} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
           </div>
         )}
-        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { 
-            const sourceMethod = w.method === PaymentMethod.Contanti ? PaymentMethod.Bancomat : PaymentMethod.Contanti;
-            setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: sourceMethod, date: format(new Date(), 'yyyy-MM-dd') }); 
-            setShowForm(true); 
-        }} onSaveExpense={handleSaveExpense} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
+        {activeTab === 'ricariche' && (
+          <RicaricheView 
+            onRefill={w => { 
+                const sourceMethod = w.method === PaymentMethod.Contanti ? PaymentMethod.Bancomat : PaymentMethod.Contanti;
+                setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: sourceMethod, date: format(new Date(), 'yyyy-MM-dd') }); 
+                setShowForm(true); 
+            }} 
+            onSaveExpense={handleSaveExpense} 
+            onUpdateWallets={handleUpdateWallets}
+            expenses={expenses} 
+            currency={userSettings.currency} 
+            wallets={userSettings.wallets} 
+          />
+        )}
         {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session.user.email} />}
+        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} onDeleteAdjustments={handleDeleteAdjustments} onImport={handleImportCSV} onExport={handleExportCSV} expenses={expenses} email={session.user.email} />}
         {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
+        {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
 
         {showForm && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">

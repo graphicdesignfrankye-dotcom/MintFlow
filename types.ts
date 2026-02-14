@@ -27,7 +27,9 @@ export interface Expense {
   paymentMethod: PaymentMethod;
   date: string;
   isSubscription?: boolean;
-  profile?: ProfileType; // Nuovo campo per distinguere il profilo
+  profile?: ProfileType; 
+  isExtra?: boolean; // Nuovo: Indica se è una spesa Extra
+  extraType?: 'given' | 'received'; // Nuovo: Dato o Ricevuto
 }
 
 export interface WalletConfig {
@@ -35,6 +37,7 @@ export interface WalletConfig {
   name: string;
   method: PaymentMethod;
   icon: 'zap' | 'wallet' | 'fuel' | 'credit-card';
+  balanceOffset?: number; // Saldo manuale (offset)
 }
 
 export interface UserSettings {
@@ -49,6 +52,8 @@ export interface UserSettings {
   lastBudgetUpdate?: string; // Data update personale
   lastJointBudgetUpdate?: string; // Data update cointestato
   currentProfile: ProfileType; // Profilo attualmente selezionato
+  monthlyOffset?: number; // Offset manuale per il totale spese mensile
+  lastOffsetDate?: string; // Data dell'ultimo offset manuale (per reset mensile)
 }
 
 export interface AiInsight {

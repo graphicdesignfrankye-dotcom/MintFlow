@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat, User, Users } from 'lucide-react';
+import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft } from 'lucide-react';
 import { translations } from '../utils/i18n';
 import { ProfileType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions';
-  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions') => void;
+  activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra';
+  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra') => void;
   lang?: 'it' | 'en';
   currentProfile?: ProfileType;
 }
@@ -17,7 +17,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
-      {/* Header */}
+      {/* Header Desktop */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-gray-800">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -41,6 +41,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               onClick={() => setActiveTab('list')}
               icon={<List size={18} />}
               label={t.expenses}
+            />
+            <NavButton 
+              active={activeTab === 'extra'} 
+              onClick={() => setActiveTab('extra')}
+              icon={<ArrowRightLeft size={18} />}
+              label={t.extra}
             />
             <NavButton 
               active={activeTab === 'subscriptions'} 
@@ -72,8 +78,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
       <main>{children}</main>
 
-      {/* Bottom Nav for Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-2 flex items-center justify-around pb-4 transition-colors z-50">
+      {/* Bottom Nav Scorrevole per Mobile (Mostra tutte le sezioni) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-4 flex items-center overflow-x-auto no-scrollbar gap-8 pb-4 transition-colors z-50">
         <MobileNavButton 
           active={activeTab === 'dashboard'} 
           onClick={() => setActiveTab('dashboard')}
@@ -87,10 +93,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           label={t.expenses}
         />
         <MobileNavButton 
+          active={activeTab === 'extra'} 
+          onClick={() => setActiveTab('extra')}
+          icon={<ArrowRightLeft />}
+          label={t.extra}
+        />
+        <MobileNavButton 
           active={activeTab === 'subscriptions'} 
           onClick={() => setActiveTab('subscriptions')}
           icon={<Repeat />}
-          label={t.subscriptions.substring(0, 4)}
+          label={t.subscriptions.substring(0, 5) + '.'}
         />
         <MobileNavButton 
           active={activeTab === 'ricariche'} 
@@ -99,10 +111,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           label={t.wallets}
         />
         <MobileNavButton 
+          active={activeTab === 'ai'} 
+          onClick={() => setActiveTab('ai')}
+          icon={<BrainCircuit />}
+          label="AI"
+        />
+        <MobileNavButton 
           active={activeTab === 'settings'} 
           onClick={() => setActiveTab('settings')}
           icon={<Settings />}
-          label={t.settings.substring(0, 6)}
+          label={t.settings.substring(0, 4) + '.'}
         />
       </nav>
     </div>
@@ -126,11 +144,11 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
 const MobileNavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center gap-1 transition-all flex-1 ${
+    className={`flex flex-col items-center gap-1 transition-all min-w-[60px] shrink-0 ${
       active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'
     }`}
   >
     {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2 })}
-    <span className="text-[9px] font-bold uppercase tracking-tighter truncate max-w-[60px]">{label}</span>
+    <span className="text-[10px] font-bold uppercase tracking-tighter truncate">{label}</span>
   </button>
 );

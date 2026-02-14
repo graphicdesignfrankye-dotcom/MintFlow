@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CategoryConfig, Expense, PaymentMethod, WalletConfig } from '../types';
 import { SmartCategorizer } from './SmartCategorizer';
 import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap, Copy } from 'lucide-react';
-import { isSameMonth, isAfter, startOfMonth, parseISO, startOfToday } from 'date-fns';
+import { isSameMonth, isAfter } from 'date-fns';
 
 interface ExpenseFormProps {
   onSubmit: (expense: Omit<Expense, 'id'>) => Promise<void> | void;
@@ -58,8 +58,13 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
       return;
     }
 
-    const selectedDate = parseISO(date);
-    const today = startOfToday();
+    // Replaced parseISO with native construction for local date
+    const [y, m, d] = date.split('-').map(Number);
+    const selectedDate = new Date(y, m - 1, d);
+    
+    // Replaced startOfToday with native date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     // Controllo Duplicati
     if (expenses) {
@@ -83,7 +88,9 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
     }
 
     // Controllo data passata (mesi precedenti)
-    const startOfThisMonth = startOfMonth(today);
+    // Replaced startOfMonth with native date
+    const startOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
     if (!isSameMonth(selectedDate, today) && selectedDate < startOfThisMonth) {
       setShowConfirmModal({ show: true, type: 'past' });
       return;

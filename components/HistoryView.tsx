@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Expense } from '../types';
-import { format, parseISO, startOfMonth, isSameMonth } from 'date-fns';
+import { format, isSameMonth } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers } from 'lucide-react';
 
@@ -22,14 +23,25 @@ interface YearGroup {
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, currency }) => {
+  const parseDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
   // Raggruppa le spese per Anno e poi per Mese
   const yearlyData = React.useMemo(() => {
-    const currentMonth = startOfMonth(new Date());
+    // Replaced startOfMonth with native date
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+
     const monthGroups: Record<string, MonthData> = {};
 
     expenses.forEach(e => {
-      const date = parseISO(e.date);
-      const monthStart = startOfMonth(date);
+      // Replaced parseISO with custom parseDate
+      const date = parseDate(e.date);
+      // Replaced startOfMonth with native date
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       
       // Escludi il mese in corso dallo storico
       if (isSameMonth(monthStart, currentMonth)) return;

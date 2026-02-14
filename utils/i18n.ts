@@ -7,7 +7,8 @@ export const translations = {
       subscriptions: 'Abbonamenti',
       wallets: 'Ricariche',
       ai: 'AI Insights',
-      settings: 'Impostazioni'
+      settings: 'Impostazioni',
+      extra: 'Extra'
     },
     dashboard: {
       hello: 'Ciao',
@@ -54,7 +55,8 @@ export const translations = {
       subscriptions: 'Subscriptions',
       wallets: 'Wallets',
       ai: 'AI Insights',
-      settings: 'Settings'
+      settings: 'Settings',
+      extra: 'Extra'
     },
     dashboard: {
       hello: 'Hello',

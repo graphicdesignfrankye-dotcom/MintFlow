@@ -13,10 +13,10 @@ const PACK_SEP = ' |#| ';
 
 /**
  * Utility per impacchettare i dati in una stringa compatibile col DB
- * Format: Desc |#| Method |#| IsSub |#| Profile
+ * Format: Desc |#| Method |#| IsSub |#| Profile |#| IsExtra |#| ExtraType
  */
-const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean, profile: ProfileType) => {
-  return `${desc}${PACK_SEP}${pm}${PACK_SEP}${isSub}${PACK_SEP}${profile}`;
+const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean, profile: ProfileType, isExtra: boolean, extraType: string) => {
+  return `${desc}${PACK_SEP}${pm}${PACK_SEP}${isSub}${PACK_SEP}${profile}${PACK_SEP}${isExtra}${PACK_SEP}${extraType}`;
 };
 
 /**
@@ -24,14 +24,23 @@ const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean, profil
  */
 const unpackDescription = (packedStr: string) => {
   if (!packedStr || !packedStr.includes(PACK_SEP)) {
-    return { desc: packedStr, pm: PaymentMethod.Contanti, isSub: false, profile: 'personal' as ProfileType };
+    return { 
+      desc: packedStr, 
+      pm: PaymentMethod.Contanti, 
+      isSub: false, 
+      profile: 'personal' as ProfileType,
+      isExtra: false,
+      extraType: 'given' as 'given' | 'received'
+    };
   }
   const parts = packedStr.split(PACK_SEP);
   return {
     desc: parts[0],
     pm: (parts[1] as PaymentMethod) || PaymentMethod.Contanti,
     isSub: parts[2] === 'true',
-    profile: (parts[3] as ProfileType) || 'personal'
+    profile: (parts[3] as ProfileType) || 'personal',
+    isExtra: parts[4] === 'true',
+    extraType: (parts[5] as 'given' | 'received') || 'given'
   };
 };
 
@@ -102,7 +111,9 @@ export const db = {
         description: unpacked.desc,
         paymentMethod: unpacked.pm,
         isSubscription: unpacked.isSub,
-        profile: unpacked.profile
+        profile: unpacked.profile,
+        isExtra: unpacked.isExtra,
+        extraType: unpacked.extraType
       };
     });
   },
@@ -110,12 +121,14 @@ export const db = {
   async addExpense(expense: Omit<Expense, 'id'>, userId: string): Promise<Expense> {
     console.log("Tentativo salvataggio su Supabase:", expense);
 
-    // Impacchettiamo descrizione, metodo, abbonamento e profilo
+    // Impacchettiamo descrizione, metodo, abbonamento, profilo ed extra
     const packedDesc = packDescription(
       expense.description, 
       expense.paymentMethod, 
       !!expense.isSubscription,
-      expense.profile || 'personal'
+      expense.profile || 'personal',
+      !!expense.isExtra,
+      expense.extraType || 'given'
     );
 
     const insertData: any = {
@@ -141,7 +154,9 @@ export const db = {
       paymentMethod: expense.paymentMethod,
       date: data.date,
       isSubscription: expense.isSubscription,
-      profile: expense.profile || 'personal'
+      profile: expense.profile || 'personal',
+      isExtra: expense.isExtra,
+      extraType: expense.extraType
     };
   },
 
@@ -153,9 +168,11 @@ export const db = {
     const newPM = expense.paymentMethod !== undefined ? expense.paymentMethod : currentUnpacked.pm;
     const newIsSub = expense.isSubscription !== undefined ? expense.isSubscription : currentUnpacked.isSub;
     const newProfile = expense.profile !== undefined ? expense.profile : currentUnpacked.profile;
+    const newIsExtra = expense.isExtra !== undefined ? expense.isExtra : currentUnpacked.isExtra;
+    const newExtraType = expense.extraType !== undefined ? expense.extraType : currentUnpacked.extraType;
 
     const updateData: any = {
-      description: packDescription(newDesc, newPM, newIsSub, newProfile)
+      description: packDescription(newDesc, newPM, newIsSub, newProfile, newIsExtra, newExtraType)
     };
 
     if (expense.amount !== undefined) updateData.amount = expense.amount;
@@ -173,7 +190,9 @@ export const db = {
       description: newDesc,
       paymentMethod: newPM,
       isSubscription: newIsSub,
-      profile: newProfile
+      profile: newProfile,
+      isExtra: newIsExtra,
+      extraType: newExtraType
     };
   },
 

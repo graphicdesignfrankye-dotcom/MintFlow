@@ -4,7 +4,7 @@ import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
   Trash2, Search, Filter, Edit2, AlertCircle, 
   Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils,
-  CreditCard
+  CreditCard, SlidersHorizontal
 } from 'lucide-react';
 import { format, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -25,12 +25,15 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
 
   const filteredExpenses = expenses
     .filter(e => {
-      // FILTRO 1: Nascondi gli aggiustamenti tecnici
-      const isAdjustment = e.description.toLowerCase().includes('aggiustamento');
+      // FILTRO 1: Nascondi SEMPRE gli aggiustamenti/modifiche tecniche dalla lista
+      // Queste sono operazioni di sistema sui saldi, non spese reali.
+      const desc = e.description.toLowerCase();
+      const isAdjustment = desc.includes('aggiustamento') || desc.includes('modifica saldo') || (desc.includes('modifica') && desc.includes('contanti'));
+      
       if (isAdjustment) return false;
 
       // FILTRO 2: Ricerca testuale
-      const matchesSearch = e.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = desc.includes(searchTerm.toLowerCase());
       
       // FILTRO 3: Categoria
       const matchesCategory = filterCategory === 'Tutti' || e.category === filterCategory;

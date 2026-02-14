@@ -1,52 +1,60 @@
+
 import React, { useMemo, useState } from 'react';
 import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2, Banknote } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
-import { format, isBefore, startOfToday, parseISO } from 'date-fns';
+import { format, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 interface RicaricheViewProps {
   onRefill: (wallet: WalletConfig) => void;
   onSaveExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
+  onUpdateWallets: (wallets: WalletConfig[]) => void;
   expenses: Expense[];
   currency?: string;
   wallets: WalletConfig[];
 }
 
-export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveExpense, expenses, currency = '€', wallets }) => {
+export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveExpense, onUpdateWallets, expenses, currency = '€', wallets }) => {
   const [editingWallet, setEditingWallet] = useState<WalletConfig | null>(null);
   const [newBalance, setNewBalance] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // LOGICA SALDI WALLET - STORICO COMPLETO
+  // Calcolo cumulativo per non resettare a fine mese.
   const balances = useMemo(() => {
-    const today = startOfToday();
-    
+    const parseDate = (dateStr: string) => {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    };
+
     return wallets.map(w => {
-      // Ricariche (entrate) + Aggiustamenti Positivi
+      // 1. Somma TUTTE le ricariche (storico completo)
       const totalRecharged = expenses
         .filter(e => {
           const desc = e.description.toLowerCase();
           const name = w.name.toLowerCase();
-          const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`);
+          const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
           return isInflow && e.paymentMethod !== w.method;
         })
         .reduce((sum, e) => sum + e.amount, 0);
       
-      // Spese (uscite) - Vengono scalate SOLO se la data è OGGI o FUTURA
+      // 2. Sottrai TUTTE le spese passate e odierne.
+      // Le spese FUTURE non vengono sottratte (finché non arriva la data).
       const totalSpent = expenses
         .filter(e => {
           const isWalletMethod = e.paymentMethod === w.method;
           const isNotRefill = !e.description.toLowerCase().includes('ricarica');
-          const expenseDate = parseISO(e.date);
-          // Se la data è prima di oggi, non scaliamo il saldo (richiesta utente)
-          const isNotPast = !isBefore(expenseDate, today);
+          const d = parseDate(e.date);
           
-          return isWalletMethod && isNotRefill && isNotPast;
+          return isWalletMethod && isNotRefill && !isFuture(d);
         })
         .reduce((sum, e) => sum + e.amount, 0);
       
+      const calculatedBalance = Math.max(0, totalRecharged - totalSpent);
+      
       return {
         ...w,
-        balance: Math.max(0, totalRecharged - totalSpent)
+        balance: Math.max(0, calculatedBalance + (w.balanceOffset || 0))
       };
     });
   }, [expenses, wallets]);
@@ -63,7 +71,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
     setEditingWallet(wallet);
   };
 
-  const handleBalanceUpdate = async () => {
+  const handleBalanceUpdate = () => {
     if (!editingWallet) return;
     const target = parseFloat(newBalance.replace(',', '.'));
     if (isNaN(target) || target < 0) {
@@ -71,37 +79,30 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
       return;
     }
 
-    const current = balances.find(b => b.id === editingWallet.id)?.balance || 0;
-    const diff = target - current;
+    const currentWalletState = balances.find(b => b.id === editingWallet.id);
+    if (!currentWalletState) return;
 
-    if (Math.abs(diff) < 0.01) {
-      setEditingWallet(null);
-      return;
-    }
+    // Logica Offset per saldo cumulativo
+    // Saldo Visualizzato = (RicaricheTotali - SpeseTotali) + Offset
+    // Target = (RicaricheTotali - SpeseTotali) + NuovoOffset
+    // NuovoOffset = Target - (RicaricheTotali - SpeseTotali)
+    
+    // (RicaricheTotali - SpeseTotali) è il saldo "calcolato" puro, senza offset
+    const calculatedBase = currentWalletState.balance - (editingWallet.balanceOffset || 0);
+    
+    const newOffset = target - calculatedBase;
 
     setIsSubmitting(true);
-    try {
-      const isPositive = diff > 0;
-      
-      // Logica intelligente per la fonte dell'aggiustamento:
-      // Se sto aggiungendo soldi ai contanti, la fonte è "Bancomat" (prelievo)
-      // Se sto aggiungendo a un wallet elettronico, la fonte è "Contanti" (versamento)
-      let sourceMethod = editingWallet.method === PaymentMethod.Contanti ? PaymentMethod.Bancomat : PaymentMethod.Contanti;
-      
-      await onSaveExpense({
-        description: `Aggiustamento ${editingWallet.name}`,
-        amount: Math.abs(diff),
-        category: 'Altro',
-        paymentMethod: isPositive ? sourceMethod : editingWallet.method,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        isSubscription: false
-      });
-      setEditingWallet(null);
-    } catch (err: any) {
-      alert("Errore aggiornamento: " + err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    
+    // Aggiorna la configurazione del wallet
+    const updatedWallets = wallets.map(w => 
+      w.id === editingWallet.id ? { ...w, balanceOffset: newOffset } : w
+    );
+    
+    onUpdateWallets(updatedWallets);
+    
+    setEditingWallet(null);
+    setIsSubmitting(false);
   };
 
   const getWalletIcon = (w: WalletConfig) => {
@@ -117,10 +118,10 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">I tuoi Portafogli</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Le spese passate non influenzano il saldo residuo.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Il saldo è cumulativo e non si resetta a fine mese.</p>
         </div>
         <div className="hidden md:flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800 uppercase tracking-widest">
-          <Info size={12} /> Smart Balance
+          <Info size={12} /> Saldo Reale
         </div>
       </div>
 
@@ -142,7 +143,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
       <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm transition-colors">
         <div className="flex items-center gap-2 mb-6">
           <Clock className="text-emerald-500" size={20} />
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white">Movimenti Portafogli</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white">Storico Ricariche</h3>
         </div>
         <div className="space-y-3">
           {refillExpenses.length > 0 ? (
@@ -194,7 +195,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
                 onChange={(e) => setNewBalance(e.target.value)} 
                 className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-black text-2xl" 
               />
-              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Verrà creata una transazione di aggiustamento</p>
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Questo modificherà solo il valore visualizzato, senza creare transazioni.</p>
             </div>
 
             <button 
@@ -202,7 +203,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
               disabled={isSubmitting}
               className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-emerald-600 transition-colors"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />} Salva Saldo
+              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />} Salva Modifica
             </button>
           </div>
         </div>
