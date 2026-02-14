@@ -62,15 +62,13 @@ const App: React.FC = () => {
     
     try {
       const parsed = JSON.parse(saved);
-      // Ensure jointBudget and currentProfile exist for old saved data
       const merged = { 
         ...defaultSettings, 
         ...parsed,
-        currentProfile: 'personal', // Force personal profile
+        currentProfile: 'personal',
         jointBudget: parsed.jointBudget || defaultSettings.jointBudget
       };
       
-      // Assicuriamoci che il wallet contanti sia presente se non c'è
       if (!merged.wallets.some(w => w.method === PaymentMethod.Contanti)) {
           merged.wallets = [defaultWallets[0], ...merged.wallets];
       }
@@ -80,6 +78,15 @@ const App: React.FC = () => {
       return defaultSettings;
     }
   });
+
+  // Gestione Dark Mode (DOM side)
+  useEffect(() => {
+    if (userSettings.isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [userSettings.isDarkMode]);
 
   // Filtra spese in base al profilo attivo (ora solo personal)
   const expenses = useMemo(() => {
@@ -105,9 +112,6 @@ const App: React.FC = () => {
       const lastUpdateStr = userSettings.lastBudgetUpdate;
       const lastUpdate = lastUpdateStr ? parseISO(lastUpdateStr) : null;
       
-      // Mostra il prompt se:
-      // 1. Mai impostato (nuovo utente)
-      // 2. L'ultimo aggiornamento è di un mese precedente a quello attuale
       if (!lastUpdate || !isSameMonth(lastUpdate, today)) {
         setShowBudgetPrompt(true);
       }
@@ -154,8 +158,6 @@ const App: React.FC = () => {
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id'>) => {
     try {
       setIsSyncing(true);
-      
-      // Assicura che la spesa sia associata al profilo corrente (sempre personal)
       const dataToSave = {
         ...expenseData,
         profile: 'personal' as ProfileType
@@ -233,7 +235,6 @@ const App: React.FC = () => {
 
           if (!rawDate || !rawAmount) continue;
 
-          // Date Parsing
           let date = "";
           const dateMatch = rawDate.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
           if (dateMatch) {
@@ -244,7 +245,6 @@ const App: React.FC = () => {
             date = rawDate;
           }
 
-          // Amount Parsing
           const amount = parseFloat(rawAmount.replace(',', '.').replace(/[^0-9.-]/g, ''));
 
           if (!date || isNaN(amount)) {
@@ -252,7 +252,6 @@ const App: React.FC = () => {
             continue;
           }
 
-          // Duplicate check
           const isDuplicate = allExpenses.some(e => e.date === date && Math.abs(e.amount - amount) < 0.01 && e.description === rawDesc);
           if (isDuplicate) {
             skippedCount++;
