@@ -114,9 +114,9 @@ export const db = {
         email, 
         display_name: name,
         role,
-        status: 'active',
+        // RIMOSSO status: 'active' per evitare loop di reset
         last_login: new Date().toISOString() 
-      })
+      }, { onConflict: 'id' })
       .select();
     if (error) throw error;
     return data;
@@ -146,7 +146,7 @@ export const db = {
       .from('profiles')
       .update({ status: status })
       .eq('id', id)
-      .select(); // Fondamentale per confermare l'avvenuta modifica (Policy RLS)
+      .select();
     
     if (error) throw error;
     return data;

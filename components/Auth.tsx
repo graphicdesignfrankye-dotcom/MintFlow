@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { auth, db } from '../services/supabase';
-import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff, ShieldCheck, MailWarning, KeyRound, ArrowLeft } from 'lucide-react';
+import { auth, db, supabase } from '../services/supabase';
+import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff, ShieldCheck, MailWarning, KeyRound, ArrowLeft, Ban } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: () => void;
@@ -21,6 +21,9 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
   const [resetSentEmail, setResetSentEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Stato per il blocco account rilevato al login
+  const [isBanned, setIsBanned] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,13 +46,11 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
       try {
           await auth.signIn(email, password);
       } catch (e) {
-          console.warn("Admin non presente su DB, proseguo come Mock (Solo lettura)");
+          console.warn("Admin non presente su DB, proseguo come Mock");
       }
       
       if (onAdminLogin) {
         onAdminLogin();
-      } else {
-        alert("Funzionalità admin non configurata nel componente padre");
       }
       setLoading(false);
       return;
@@ -57,21 +58,26 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
 
     try {
       if (isLogin) {
+        // 1. Esegui il login tecnico con Supabase
         const data = await auth.signIn(email, password);
+        
         if (data.user) {
-            try {
-                const profile = await db.getProfile(data.user.id);
-                if (profile && profile.status === 'disabled') {
-                    await auth.signOut();
-                    throw new Error("Account disabilitato. Contatta l'amministratore.");
-                }
-            } catch (profileErr: any) {
-                if (profileErr.message.includes('disabilitato')) {
-                    throw profileErr;
-                }
-                console.warn("Impossibile verificare lo stato profilo:", profileErr);
-            }
+          // 2. CONTROLLO IMMEDIATO DELLO STATO NEL DATABASE
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('status')
+            .eq('id', data.user.id)
+            .single();
+
+          if (profile?.status === 'disabled') {
+            // Se è bannato, attiviamo la Lock Screen interna e fermiamo tutto
+            setIsBanned(true);
+            setLoading(false);
+            return;
+          }
         }
+        
+        // 3. Se arriviamo qui, l'utente è attivo: procedi
         onSuccess();
       } else {
         await auth.signUp(email, password, username);
@@ -89,19 +95,48 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
     }
   };
 
-  const handleResend = async () => {
-    if (!signedUpEmail) return;
-    setResending(true);
-    try {
-      await auth.resendConfirmation(signedUpEmail);
-      alert("Email reinviata! Controlla di nuovo.");
-    } catch (err: any) {
-      setError("Errore nel rinvio: " + err.message);
-    } finally {
-      setResending(false);
-    }
+  const handleBackToLogin = async () => {
+    // Esci tecnicamente per pulire la sessione "congelata"
+    await auth.signOut();
+    setIsBanned(false);
+    setLoading(false);
   };
 
+  // --- SCHERMATA DI BLOCCO "ALLA PORTA" ---
+  if (isBanned) {
+    return (
+      <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex items-center justify-center p-4 animate-in fade-in duration-500">
+        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-[3.5rem] shadow-2xl p-10 md:p-12 text-center border-4 border-red-500/20 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-2 bg-red-500" />
+          
+          <div className="bg-red-50 dark:bg-red-900/20 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+            <Ban className="text-red-500 animate-pulse" size={48} />
+          </div>
+          
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Accesso Sospeso</h2>
+          <p className="text-gray-500 dark:text-gray-400 font-medium mb-10 leading-relaxed">
+            Il tuo account MintFlow è stato disabilitato. Non puoi accedere ai tuoi dati finché l'amministratore non riabilita il tuo profilo.
+          </p>
+          
+          <div className="space-y-4">
+             <a href="mailto:assistenza@mintflow.com" className="flex items-center justify-center gap-2 w-full py-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold hover:scale-[1.02] transition-transform">
+               Invia Segnalazione
+             </a>
+             <button 
+               onClick={handleBackToLogin}
+               className="w-full py-4 text-gray-400 font-bold hover:text-gray-600 dark:hover:text-gray-200 transition-colors text-sm"
+             >
+               Torna alla maschera di login
+             </button>
+          </div>
+
+          <p className="mt-12 text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em]">MintFlow Security Shield</p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDERING NORMALE DEL LOGIN (Reso esistente) ---
   if (resetSentEmail) {
     return (
       <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex items-center justify-center p-4">
@@ -152,7 +187,18 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
 
           <div className="space-y-3">
             <button
-              onClick={handleResend}
+              onClick={async () => {
+                if (!signedUpEmail) return;
+                setResending(true);
+                try {
+                  await auth.resendConfirmation(signedUpEmail);
+                  alert("Email reinviata! Controlla di nuovo.");
+                } catch (err: any) {
+                  setError("Errore nel rinvio: " + err.message);
+                } finally {
+                  setResending(false);
+                }
+              }}
               disabled={resending}
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50"
             >
