@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Users, Bell, Ban, Search, LogOut, CheckCircle2, X, Send, AlertTriangle, Loader2, Database, Terminal, Copy } from 'lucide-react';
 import { db } from '../services/supabase';
+import { ConfirmModal } from './ConfirmModal';
 import { format } from 'date-fns';
 import it from 'date-fns/locale/it';
 
@@ -28,15 +29,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [notificationText, setNotificationText] = useState('');
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+  
+  // Configurazione per il modal di conferma
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    userId: string;
+    userName: string;
+    newStatus: 'active' | 'disabled';
+  }>({ isOpen: false, userId: '', userName: '', newStatus: 'active' });
 
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
-        // Carichiamo solo i dati reali dal database
         const data = await db.getAllProfiles();
         setUsers(data as AdminUser[]);
-        console.log("Utenti caricati dal DB:", data);
     } catch (err: any) {
         console.error("Errore fetch:", err);
         setError("Errore nel caricamento dal database.");
@@ -52,29 +59,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleToggleStatus = async (id: string, e: React.MouseEvent) => {
+  const handleToggleStatusRequest = (user: AdminUser, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    setConfirmConfig({
+      isOpen: true,
+      userId: user.id,
+      userName: user.display_name || user.email,
+      newStatus: user.status === 'active' ? 'disabled' : 'active'
+    });
+  };
 
-    const user = users.find(u => u.id === id);
-    if (!user) return;
+  const executeToggleStatus = async () => {
+    const { userId, newStatus } = confirmConfig;
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
-    const newStatus = user.status === 'active' ? 'disabled' : 'active';
-
-    if (window.confirm(`Vuoi davvero impostare l'utente ${user.email} come ${newStatus}?`)) {
-        try {
-            const data = await db.updateUserStatus(id, newStatus);
-            // Verifica RLS: se il database non restituisce nulla, la modifica è stata bloccata dalle policy
-            if (!data || data.length === 0) {
-                 showToast("Errore: Il database ha rifiutato la modifica (Verifica Policy SQL)", "error");
-                 return;
-            }
-            setUsers(prev => prev.map(u => u.id === id ? { ...u, status: newStatus } : u));
-            showToast(`Utente aggiornato a ${newStatus}`);
-        } catch (err: any) {
-            console.error("Errore durante l'aggiornamento:", err);
-            showToast("Errore: " + err.message, "error");
+    try {
+        const data = await db.updateUserStatus(userId, newStatus);
+        if (!data || data.length === 0) {
+             showToast("Errore: Il database ha rifiutato la modifica (Verifica Policy SQL)", "error");
+             return;
         }
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+        showToast(`Utente ${newStatus === 'active' ? 'riattivato' : 'disabilitato'} con successo`);
+    } catch (err: any) {
+        console.error("Errore durante l'aggiornamento:", err);
+        showToast("Errore: " + err.message, "error");
     }
   };
 
@@ -155,7 +166,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       {user.email !== 'admin@mintflow.com' && (
                         <div className="flex gap-2">
                           <button onClick={() => { setSelectedUser(user); setShowNotifyModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Bell size={18} /></button>
-                          <button onClick={e => handleToggleStatus(user.id, e)} className={`p-2 rounded-lg ${user.status === 'active' ? 'text-gray-400 hover:text-red-500 hover:bg-red-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                          <button onClick={e => handleToggleStatusRequest(user, e)} className={`p-2 rounded-lg ${user.status === 'active' ? 'text-gray-400 hover:text-red-500 hover:bg-red-50' : 'text-emerald-600 bg-emerald-50'}`}>
                             {user.status === 'active' ? <Ban size={18} /> : <CheckCircle2 size={18} />}
                           </button>
                         </div>
@@ -171,6 +182,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         </div>
       </main>
 
+      {/* MODAL NOTIFICHE */}
       {showNotifyModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
@@ -184,6 +196,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         </div>
       )}
 
+      {/* SQL MODAL */}
       {showSqlModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto">
@@ -206,6 +219,17 @@ CREATE POLICY "Admin update all" ON public.profiles FOR UPDATE USING ((auth.jwt(
           </div>
         </div>
       )}
+
+      {/* MODAL DI CONFERMA STATO */}
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.newStatus === 'disabled' ? "Disabilita Utente" : "Riattiva Utente"}
+        message={`Sei sicuro di voler cambiare lo stato di ${confirmConfig.userName} a ${confirmConfig.newStatus === 'disabled' ? 'Disabilitato' : 'Attivo'}?`}
+        confirmText={confirmConfig.newStatus === 'disabled' ? "Sì, Blocca" : "Sì, Attiva"}
+        type={confirmConfig.newStatus === 'disabled' ? 'danger' : 'success'}
+        onConfirm={executeToggleStatus}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };
