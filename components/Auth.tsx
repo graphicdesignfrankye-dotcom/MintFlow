@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { auth, db } from '../services/supabase'; // Import db
-import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff, ShieldCheck, MailWarning } from 'lucide-react';
+import { auth, db } from '../services/supabase';
+import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff, ShieldCheck, MailWarning, KeyRound, ArrowLeft } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: () => void;
@@ -10,6 +10,7 @@ interface AuthProps {
 
 export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +18,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
+  const [resetSentEmail, setResetSentEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -25,42 +27,51 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
     setError(null);
     setLoading(true);
 
-    // BACKDOOR ADMIN: Permette l'accesso immediato all'admin senza registrazione reale su Supabase
-    if (email === 'admin@mintflow.com' && password === 'admin123') {
-      if (onAdminLogin) {
-        onAdminLogin();
-      } else {
-        alert("Funzionalità admin non configurata nel componente padre");
+    if (isResetting) {
+      try {
+        await auth.resetPassword(email);
+        setResetSentEmail(email);
+      } catch (err: any) {
+        setError(err.message || "Errore durante il reset della password");
+      } finally {
         setLoading(false);
       }
       return;
     }
 
+    if (email === 'admin@mintflow.com' && password === 'admin123') {
+      try {
+          await auth.signIn(email, password);
+      } catch (e) {
+          console.warn("Admin non presente su DB, proseguo come Mock (Solo lettura)");
+      }
+      
+      if (onAdminLogin) {
+        onAdminLogin();
+      } else {
+        alert("Funzionalità admin non configurata nel componente padre");
+      }
+      setLoading(false);
+      return;
+    }
+
     try {
       if (isLogin) {
-        // 1. Esegui il login standard
         const data = await auth.signIn(email, password);
-        
-        // 2. CHECK DI SICUREZZA BLOCCANTE: Controlla se l'utente è disabilitato
         if (data.user) {
             try {
                 const profile = await db.getProfile(data.user.id);
                 if (profile && profile.status === 'disabled') {
-                    // Se disabilitato, disconnetti immediatamente e lancia errore
                     await auth.signOut();
                     throw new Error("Account disabilitato. Contatta l'amministratore.");
                 }
             } catch (profileErr: any) {
-                // Se l'errore è proprio "Account disabilitato", rilancialo
                 if (profileErr.message.includes('disabilitato')) {
                     throw profileErr;
                 }
-                // Altri errori (es. profilo non trovato) non dovrebbero bloccare il login
                 console.warn("Impossibile verificare lo stato profilo:", profileErr);
             }
         }
-
-        // 3. Se tutto ok, procedi
         onSuccess();
       } else {
         await auth.signUp(email, password, username);
@@ -91,6 +102,29 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
     }
   };
 
+  if (resetSentEmail) {
+    return (
+      <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <KeyRound className="text-emerald-600 dark:text-emerald-400" size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Link inviato!</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-8">
+            Abbiamo inviato le istruzioni per il reset a <br/>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">{resetSentEmail}</span>
+          </p>
+          <button
+            onClick={() => { setResetSentEmail(null); setIsResetting(false); setIsLogin(true); }}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold transition-all shadow-lg"
+          >
+            Torna al Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (signedUpEmail && !isLogin) {
     return (
       <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex items-center justify-center p-4">
@@ -113,10 +147,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
                 <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
                   L'email potrebbe finire nella cartella <strong>Posta Indesiderata</strong> o <strong>Promozioni</strong>.
                 </p>
-                <ul className="text-xs text-amber-700 dark:text-amber-400 list-disc pl-4 space-y-1 mt-1">
-                    <li>Cerca email provenienti da <strong>Supabase</strong>.</li>
-                    <li>Il mittente è spesso <em>noreply@supabase.co</em>.</li>
-                </ul>
             </div>
           </div>
 
@@ -145,11 +175,15 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl p-8 border border-emerald-100 dark:border-gray-700 animate-in zoom-in-95 duration-300">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-emerald-500 p-4 rounded-2xl text-white mb-4 shadow-lg shadow-emerald-200">
-            <PiggyBank size={32} />
+            {isResetting ? <KeyRound size={32} /> : <PiggyBank size={32} />}
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">MintFlow</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {isResetting ? 'Recupero Password' : 'MintFlow'}
+          </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {isLogin ? 'Accedi al tuo account cloud' : 'Crea il tuo profilo finanziario'}
+            {isResetting 
+              ? 'Ti invieremo un link per resettare la password' 
+              : isLogin ? 'Accedi al tuo account cloud' : 'Crea il tuo profilo finanziario'}
           </p>
         </div>
 
@@ -157,14 +191,11 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-xl border border-red-100 dark:border-red-900/30 flex items-center gap-2">
             <AlertCircle size={16} />
             <span className="flex-1">{error}</span>
-            {error.includes('confermare') && (
-              <button onClick={handleResend} className="text-[10px] bg-red-100 dark:bg-red-800 px-2 py-1 rounded font-bold uppercase">Reinvia</button>
-            )}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
+          {!isLogin && !isResetting && (
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
@@ -172,8 +203,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
                 placeholder="Nome Utente"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-12 pr-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
-                required={!isLogin}
+                className="w-full pl-12 pr-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
+                required={!isLogin && !isResetting}
               />
             </div>
           )}
@@ -185,45 +216,63 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-12 pr-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
+              className="w-full pl-12 pr-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
               required
             />
           </div>
 
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-12 pr-12 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between px-2">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <div 
-                onClick={() => setRememberMe(!rememberMe)}
-                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                  rememberMe 
-                    ? 'bg-emerald-500 border-emerald-500' 
-                    : 'border-gray-200 dark:border-gray-600 bg-transparent'
-                }`}
-              >
-                {rememberMe && <Check size={14} className="text-white" />}
+          {!isResetting && (
+            <>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-12 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none dark:text-white transition-all font-medium"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium select-none">Rimani collegato</span>
-            </label>
-          </div>
+
+              {isLogin && (
+                <div className="flex justify-end px-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsResetting(true); setError(null); }}
+                    className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    Password dimenticata?
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {isLogin && !isResetting && (
+            <div className="flex items-center gap-2 px-2">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div 
+                  onClick={() => setRememberMe(!rememberMe)}
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    rememberMe 
+                      ? 'bg-emerald-500 border-emerald-500' 
+                      : 'border-gray-200 dark:border-gray-600 bg-transparent'
+                  }`}
+                >
+                  {rememberMe && <Check size={14} className="text-white" />}
+                </div>
+                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium select-none">Rimani collegato</span>
+              </label>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -234,7 +283,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
               <Loader2 className="animate-spin" size={20} />
             ) : (
               <>
-                {isLogin ? 'Accedi' : 'Iscriviti'}
+                {isResetting ? 'Invia link di recupero' : isLogin ? 'Accedi' : 'Iscriviti'}
                 <ArrowRight size={20} />
               </>
             )}
@@ -242,14 +291,22 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
         </form>
 
         <div className="mt-8 text-center space-y-4">
-          <button
-            onClick={() => { setIsLogin(!isLogin); setError(null); }}
-            className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline block w-full"
-          >
-            {isLogin ? 'Non hai un account? Iscriviti' : 'Hai già un account? Accedi'}
-          </button>
+          {isResetting ? (
+            <button
+              onClick={() => { setIsResetting(false); setError(null); }}
+              className="text-emerald-600 dark:text-emerald-400 font-bold text-sm flex items-center justify-center gap-2 w-full hover:underline"
+            >
+              <ArrowLeft size={16} /> Torna al login
+            </button>
+          ) : (
+            <button
+              onClick={() => { setIsLogin(!isLogin); setError(null); }}
+              className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline block w-full"
+            >
+              {isLogin ? 'Non hai un account? Iscriviti' : 'Hai già un account? Accedi'}
+            </button>
+          )}
           
-           {/* Admin Hint */}
            <div className="text-[10px] text-gray-300 dark:text-gray-600 flex items-center justify-center gap-1">
             <ShieldCheck size={12} />
             <span>Admin Demo: admin@mintflow.com / admin123</span>
