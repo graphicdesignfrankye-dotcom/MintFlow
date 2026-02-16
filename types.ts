@@ -28,8 +28,8 @@ export interface Expense {
   date: string;
   isSubscription?: boolean;
   profile?: ProfileType; 
-  isExtra?: boolean; // Nuovo: Indica se è una spesa Extra
-  extraType?: 'given' | 'received'; // Nuovo: Dato o Ricevuto
+  isExtra?: boolean;
+  extraType?: 'given' | 'received';
 }
 
 export interface WalletConfig {
@@ -37,23 +37,32 @@ export interface WalletConfig {
   name: string;
   method: PaymentMethod;
   icon: 'zap' | 'wallet' | 'fuel' | 'credit-card';
-  balanceOffset?: number; // Saldo manuale (offset)
+  balanceOffset?: number;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface UserSettings {
   name: string;
-  monthlyBudget: number; // Budget Personale
-  jointBudget?: number;  // Budget Cointestato
+  monthlyBudget: number;
+  jointBudget?: number;
   currency: string;
   isDarkMode: boolean;
   wallets: WalletConfig[];
   categories: CategoryConfig[];
   language: 'it' | 'en';
-  lastBudgetUpdate?: string; // Data update personale
-  lastJointBudgetUpdate?: string; // Data update cointestato
-  currentProfile: ProfileType; // Profilo attualmente selezionato
-  monthlyOffset?: number; // Offset manuale per il totale spese mensile
-  lastOffsetDate?: string; // Data dell'ultimo offset manuale (per reset mensile)
+  lastBudgetUpdate?: string;
+  lastJointBudgetUpdate?: string;
+  currentProfile: ProfileType;
+  monthlyOffset?: number;
+  lastOffsetDate?: string;
 }
 
 export interface AiInsight {

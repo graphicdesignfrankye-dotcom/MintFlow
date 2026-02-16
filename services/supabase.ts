@@ -1,12 +1,21 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Expense, PaymentMethod, ProfileType } from '../types';
+import { Expense, PaymentMethod, ProfileType, AppNotification } from '../types';
 
 const SUPABASE_URL = 'https://jpcweqcqysxgzycftzyv.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwY3dlcWNxeXN4Z3p5Y2Z0enl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NzEwMDYsImV4cCI6MjA4NjI0NzAwNn0.nMiOuiPYiz_wIdaS7j-ONA_RZ8MNs2_g7RfQrZ339dM';
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwY3dlcWNxeXN4Z3p5Y2Z0enl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDY3MTAwNiwiZXhwIjoyMDg2MjQ3MDA2fQ.xkIPrLb3h4hvFk41LiA5xij0DmD_mGm0jnTh1IViJZY';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const getRedirectUrl = () => window.location.origin;
+
+export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+    storageKey: 'sb-admin-auth'
+  }
+});
 
 const PACK_SEP = ' |#| ';
 
@@ -41,32 +50,22 @@ export const auth = {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: username }, emailRedirectTo: getRedirectUrl() }
+      options: { data: { display_name: username }, emailRedirectTo: window.location.origin }
     });
     if (error) throw error;
     if (data.user) {
         try {
             await db.upsertProfile(data.user.id, email, username);
         } catch (e) {
-            console.error("Errore creazione profilo iniziale:", e);
+            console.error("Errore creazione profilo:", e);
         }
     }
     return data;
-  },
-  async resendConfirmation(email: string) {
-    const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: getRedirectUrl() } });
-    if (error) throw error;
   },
   async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
-  },
-  async resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: getRedirectUrl(),
-    });
-    if (error) throw error;
   },
   async signOut() {
     const { error } = await supabase.auth.signOut();
@@ -81,7 +80,7 @@ export const auth = {
     return data;
   },
   async updateEmail(newEmail: string) {
-    const { data, error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo: getRedirectUrl() });
+    const { data, error } = await supabase.auth.updateUser({ email: newEmail });
     if (error) throw error;
     return data;
   },
@@ -94,13 +93,19 @@ export const auth = {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await db.clearAll(user.id);
-      try {
-        await supabase.from('profiles').delete().eq('id', user.id);
-      } catch (e) {
-        console.error("Errore cancellazione profilo", e);
-      }
+      await supabase.from('profiles').delete().eq('id', user.id);
       await this.signOut();
     }
+  },
+  async resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
+  },
+  async resendConfirmation(email: string) {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) throw error;
   }
 };
 
@@ -114,7 +119,6 @@ export const db = {
         email, 
         display_name: name,
         role,
-        // RIMOSSO status: 'active' per evitare loop di reset
         last_login: new Date().toISOString() 
       }, { onConflict: 'id' })
       .select();
@@ -123,54 +127,49 @@ export const db = {
   },
 
   async getAllProfiles() {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('email');
+    const { data, error } = await supabase.from('profiles').select('*').order('email');
     if (error) throw error;
     return data || [];
   },
 
-  async getProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (error) return null;
-    return data;
-  },
-
   async updateUserStatus(id: string, status: 'active' | 'disabled') {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ status: status })
-      .eq('id', id)
-      .select();
-    
+    const { data, error } = await supabase.from('profiles').update({ status }).eq('id', id).select();
     if (error) throw error;
     return data;
   },
 
-  async sendNotification(id: string, message: string) {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ notification: message })
-      .eq('id', id);
+  // NOTIFICHE
+  async sendNotification(userId: string, title: string, message: string) {
+    const { error } = await supabaseAdmin.from('notifications').insert([{
+      user_id: userId,
+      title,
+      message,
+      is_read: false
+    }]);
     if (error) throw error;
   },
 
-  async clearNotification(userId: string) {
-      const { error } = await supabase.from('profiles').update({ notification: null }).eq('id', userId);
-      if (error) throw error;
-  },
-
-  async getExpenses(userId: string): Promise<Expense[]> {
+  async getNotifications(userId: string): Promise<AppNotification[]> {
     const { data, error } = await supabase
-      .from('expenses')
+      .from('notifications')
       .select('*')
       .eq('user_id', userId)
-      .order('date', { ascending: false });
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async markNotificationRead(notificationId: string) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+    if (error) throw error;
+  },
+
+  // SPESE
+  async getExpenses(userId: string): Promise<Expense[]> {
+    const { data, error } = await supabase.from('expenses').select('*').eq('user_id', userId).order('date', { ascending: false });
     if (error) throw error;
     return (data || []).map((e: any) => {
       const unpacked = unpackDescription(e.description);
@@ -190,14 +189,7 @@ export const db = {
   },
 
   async addExpense(expense: Omit<Expense, 'id'>, userId: string): Promise<Expense> {
-    const packedDesc = packDescription(
-      expense.description, 
-      expense.paymentMethod, 
-      !!expense.isSubscription,
-      expense.profile || 'personal',
-      !!expense.isExtra,
-      expense.extraType || 'given'
-    );
+    const packedDesc = packDescription(expense.description, expense.paymentMethod, !!expense.isSubscription, expense.profile || 'personal', !!expense.isExtra, expense.extraType || 'given');
     const { data, error } = await supabase.from('expenses').insert([{
       description: packedDesc,
       amount: expense.amount,
@@ -206,10 +198,7 @@ export const db = {
       user_id: userId
     }]).select().single();
     if (error) throw error;
-    return {
-      id: data.id,
-      ...expense
-    };
+    return { id: data.id, ...expense };
   },
 
   async updateExpense(id: string, expense: Partial<Omit<Expense, 'id'>>): Promise<Expense> {
@@ -230,18 +219,7 @@ export const db = {
     }).eq('id', id).select().single();
     if (error) throw error;
     const unpacked = unpackDescription(data.description);
-    return {
-      id: data.id,
-      amount: data.amount,
-      category: data.category,
-      date: data.date,
-      description: unpacked.desc,
-      paymentMethod: unpacked.pm,
-      isSubscription: unpacked.isSub,
-      profile: unpacked.profile,
-      isExtra: unpacked.isExtra,
-      extraType: unpacked.extraType
-    };
+    return { id: data.id, ...data, ...unpacked, description: unpacked.desc, paymentMethod: unpacked.pm, isSubscription: unpacked.isSub };
   },
 
   async deleteExpense(id: string) {
