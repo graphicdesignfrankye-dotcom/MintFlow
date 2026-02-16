@@ -14,7 +14,11 @@ interface AdminUser {
   role: 'user' | 'admin';
 }
 
-export const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onLogout: () => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,13 +116,18 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleSendNotification = () => {
-    if (!notificationText.trim()) return;
-    console.log(`Sending to ${selectedUser?.email}: ${notificationText}`);
-    showToast(`Notifica inviata a ${selectedUser?.email}`);
-    setShowNotifyModal(false);
-    setNotificationText('');
-    setSelectedUser(null);
+  const handleSendNotification = async () => {
+    if (!notificationText.trim() || !selectedUser) return;
+    
+    try {
+      await db.sendNotification(selectedUser.id, notificationText);
+      showToast(`Notifica inviata a ${selectedUser.email}`);
+      setShowNotifyModal(false);
+      setNotificationText('');
+      setSelectedUser(null);
+    } catch (err: any) {
+      showToast('Errore invio notifica: ' + err.message, 'error');
+    }
   };
 
   const handleChangePassword = () => {
@@ -139,11 +148,22 @@ export const AdminDashboard: React.FC = () => {
       } catch (e) {
           // Ignora errori logout
       }
-      window.location.reload();
+      onLogout(); // Reindirizza al login immediatamente
   };
 
   const sqlImportScript = `
--- Importa utenti esistenti da Auth a Profiles
+-- 1. Crea la tabella profiles se non esiste (con colonna notification)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  email text,
+  display_name text,
+  role text DEFAULT 'user',
+  status text DEFAULT 'active',
+  last_login timestamptz,
+  notification text -- Colonna per i messaggi admin
+);
+
+-- 2. Importa utenti esistenti da Auth
 INSERT INTO public.profiles (id, email, display_name, last_login, role, status)
 SELECT 
     id, 
@@ -155,6 +175,26 @@ SELECT
 FROM auth.users
 ON CONFLICT (id) DO UPDATE 
 SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
+
+-- 3. Abilita RLS (Row Level Security)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- 4. Policy cleanup (Rimuove vecchie policy problematiche)
+DROP POLICY IF EXISTS "Users can see own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can see all" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can update all" ON public.profiles;
+
+-- 5. Crea Policy (Versione corretta senza ricorsione)
+CREATE POLICY "Users can see own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+
+-- NOTA: Usa l'email dal token JWT per evitare loop infiniti di lettura
+CREATE POLICY "Admin can see all" ON public.profiles FOR SELECT USING (
+  (auth.jwt() ->> 'email') = 'admin@mintflow.com'
+);
+
+CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
+  (auth.jwt() ->> 'email') = 'admin@mintflow.com'
+);
   `.trim();
 
   // Componente Avatar Riutilizzabile
@@ -242,7 +282,7 @@ SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
                 <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={24} />
                 <div>
                   <h3 className="font-bold text-red-600 dark:text-red-400 text-sm">Database non configurato</h3>
-                  <p className="text-xs text-red-500/80 mt-1">Clicca qui per vedere lo script SQL necessario.</p>
+                  <p className="text-xs text-red-500/80 mt-1">Clicca qui per vedere lo script SQL necessario (Aggiornato).</p>
                 </div>
             </div>
         )}
@@ -285,7 +325,26 @@ SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
                         <div className="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => { setSelectedUser(user); setShowNotifyModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"><Bell size={18} /></button>
                           <button onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }} className="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg"><Key size={18} /></button>
-                          <button onClick={() => handleToggleStatus(user.id)} className={`p-2 rounded-lg ${user.status === 'active' ? 'text-gray-400 hover:text-red-500' : 'text-emerald-500'}`}>{user.status === 'active' ? <Ban size={18} /> : <CheckCircle2 size={18} />}</button>
+                          
+                          {/* PULSANTE GESTIONE STATO UTENTE */}
+                          {user.status === 'active' ? (
+                            <button 
+                              onClick={() => handleToggleStatus(user.id)} 
+                              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title="Disabilita Utente"
+                            >
+                              <Ban size={18} />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleToggleStatus(user.id)} 
+                              className="p-2 rounded-lg text-emerald-600 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 transition-colors font-bold shadow-sm ring-1 ring-emerald-500/30"
+                              title="Riattiva Utente Disabilitato"
+                            >
+                              <CheckCircle2 size={18} />
+                            </button>
+                          )}
+
                           <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 size={18} /></button>
                         </div>
                       )}
@@ -332,10 +391,20 @@ SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
                        <Key size={18} />
                        <span className="text-[9px] font-bold mt-1">Pwd</span>
                     </button>
-                    <button onClick={() => handleToggleStatus(user.id)} className={`flex flex-col items-center justify-center p-2 rounded-xl ${user.status === 'active' ? 'text-gray-500 bg-gray-100' : 'text-emerald-500 bg-emerald-50'}`}>
+                    
+                    {/* PULSANTE MOBILE */}
+                    <button 
+                        onClick={() => handleToggleStatus(user.id)} 
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border ${
+                            user.status === 'active' 
+                                ? 'text-gray-500 bg-gray-100 border-transparent' 
+                                : 'text-emerald-600 bg-emerald-100 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800'
+                        }`}
+                    >
                        {user.status === 'active' ? <Ban size={18} /> : <CheckCircle2 size={18} />}
-                       <span className="text-[9px] font-bold mt-1">{user.status === 'active' ? 'Blocca' : 'Attiva'}</span>
+                       <span className="text-[9px] font-bold mt-1">{user.status === 'active' ? 'Blocca' : 'Riattiva'}</span>
                     </button>
+
                     <button onClick={() => handleDeleteUser(user.id)} className="flex flex-col items-center justify-center p-2 rounded-xl text-red-500 bg-red-50 dark:bg-red-900/10">
                        <Trash2 size={18} />
                        <span className="text-[9px] font-bold mt-1">Elimina</span>
@@ -367,7 +436,7 @@ SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
                 <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-4 flex items-start gap-3">
                     <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
                     <p className="text-sm text-amber-700 dark:text-amber-400">
-                        Esegui questo script nel <strong>Supabase SQL Editor</strong> per importare gli utenti già registrati e sincronizzare l'admin.
+                        Esegui questo script nel <strong>Supabase SQL Editor</strong> per configurare il database correttamente (inclusa la tabella notifiche).
                     </p>
                 </div>
 

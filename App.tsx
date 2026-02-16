@@ -13,9 +13,56 @@ import { ExtraView } from './components/ExtraView';
 import { Auth } from './components/Auth';
 import { AdminDashboard } from './components/AdminDashboard'; // Importato
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig, ProfileType } from './types';
-import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight } from 'lucide-react';
+import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight, Ban, MessageSquare, X } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
 import { format, isSameMonth } from 'date-fns';
+
+interface BudgetPromptModalProps {
+  onConfirm: (amount: number) => void;
+  initialValue: number;
+  currency: string;
+  isNewUser: boolean;
+}
+
+const BudgetPromptModal: React.FC<BudgetPromptModalProps> = ({ onConfirm, initialValue, currency, isNewUser }) => {
+  const [value, setValue] = useState(initialValue.toString());
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl text-center animate-in zoom-in-95 border-4 border-emerald-500 relative">
+        <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
+          <Target size={40} />
+        </div>
+        <h2 className="text-2xl font-black text-gray-800 dark:text-white mb-2">
+          {isNewUser ? 'Benvenuto!' : 'Budget Mensile'}
+        </h2>
+        <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+          {isNewUser 
+            ? 'Per iniziare, imposta il tuo budget mensile per tenere traccia delle tue finanze.' 
+            : 'È un nuovo mese! Confermi o modifichi il tuo budget?'}
+        </p>
+        
+        <div className="relative mb-6">
+          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xl">{currency}</span>
+          <input 
+            type="number" 
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-full pl-12 pr-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none font-black text-3xl dark:text-white text-center shadow-inner"
+          />
+        </div>
+
+        <button 
+          onClick={() => onConfirm(parseFloat(value) || 0)}
+          className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold text-lg hover:bg-emerald-600 transition-transform active:scale-95 shadow-lg shadow-emerald-200 dark:shadow-none"
+        >
+          Inizia a Risparmiare
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -25,6 +72,10 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
+  
+  // Stati per Blocco Admin e Notifiche
+  const [isDisabled, setIsDisabled] = useState(false);
+  const [incomingNotification, setIncomingNotification] = useState<string | null>(null);
   
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   
@@ -148,7 +199,6 @@ const App: React.FC = () => {
         setUserSettings(prev => ({ ...prev, name: displayName }));
         
         // AUTOMAZIONE: SINCRONIZZA IL PROFILO SU DB ALL'AVVIO
-        // Questo garantisce che se l'utente esiste ma non è in tabella (es. vecchi utenti), viene aggiunto ora.
         const nameToSync = userSettings.name !== 'Utente' ? userSettings.name : displayName;
         db.upsertProfile(session.user.id, session.user.email || '', nameToSync);
       }
@@ -164,12 +214,44 @@ const App: React.FC = () => {
       if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
          const metadata = session.user.user_metadata;
          const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
-         // Chiamata asincrona al DB per assicurarsi che il profilo esista per l'admin
          await db.upsertProfile(session.user.id, session.user.email || '', displayName);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // --- CONTROLLO PERIODICO STATO E NOTIFICHE ADMIN ---
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const checkStatus = async () => {
+       const profile = await db.getProfile(session.user.id);
+       
+       if (profile) {
+           // 1. Controllo Stato Disabilitato
+           if (profile.status === 'disabled') {
+               setIsDisabled(true);
+               await auth.signOut(); // Disconnessione forzata
+           }
+
+           // 2. Controllo Notifiche
+           if (profile.notification) {
+               setIncomingNotification(profile.notification);
+               // Pulisci subito dopo averla letta nello stato locale
+               await db.clearNotification(session.user.id);
+           }
+       }
+    };
+
+    // Controllo immediato
+    checkStatus();
+
+    // Polling ogni 5 secondi per aggiornamenti in "tempo reale"
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
+
+  }, [session]);
+
 
   const fetchExpenses = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -183,12 +265,6 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [session]);
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchExpenses();
-    }
-  }, [session, fetchExpenses]);
 
   const handleAdminLogin = () => {
     setSession({
@@ -367,10 +443,36 @@ const App: React.FC = () => {
 
   if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center bg-mint-50"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   
+  // MODALE BLOCCO UTENTE DISABILITATO
+  if (isDisabled) {
+    return (
+        <div className="fixed inset-0 bg-red-50 dark:bg-gray-900 z-[9999] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+            <div className="bg-red-100 dark:bg-red-900/30 w-24 h-24 rounded-full flex items-center justify-center mb-6 text-red-600 dark:text-red-400">
+                <Ban size={48} />
+            </div>
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">Account Disabilitato</h1>
+            <p className="text-gray-600 dark:text-gray-400 max-w-sm mb-8 leading-relaxed">
+                Il tuo account è stato sospeso dall'amministratore. Non puoi accedere alle funzionalità dell'app.
+            </p>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl max-w-sm w-full">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Supporto</p>
+                <p className="text-gray-800 dark:text-white font-medium">Contatta l'amministratore:</p>
+                <a href="mailto:admin@mintflow.com" className="block mt-2 text-emerald-600 font-bold hover:underline">admin@mintflow.com</a>
+            </div>
+            <button 
+                onClick={() => window.location.reload()}
+                className="mt-8 px-6 py-3 bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-300 transition-colors"
+            >
+                Aggiorna Pagina
+            </button>
+        </div>
+    );
+  }
+
   if (!session) {
     return (
       <Auth 
-        onSuccess={() => {}} 
+        onSuccess={() => setIsDisabled(false)} 
         onAdminLogin={handleAdminLogin} 
       />
     );
@@ -378,7 +480,7 @@ const App: React.FC = () => {
 
   // CONTROL ADMINISTRATOR - REDIRECT TO ADMIN DASHBOARD
   if (session.user.email === 'admin@mintflow.com') {
-    return <AdminDashboard />;
+    return <AdminDashboard onLogout={() => setSession(null)} />;
   }
 
   return (
@@ -391,6 +493,29 @@ const App: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4">{successToast}</div>}
         
+        {/* MODALE NOTIFICA IN ARRIVO */}
+        {incomingNotification && (
+           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+               <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-300 border-4 border-emerald-500 relative">
+                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg flex items-center gap-2">
+                       <MessageSquare size={14} /> Messaggio Admin
+                   </div>
+                   <div className="mt-4 text-center">
+                       <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Nuova Notifica</h3>
+                       <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-2xl text-left">
+                           <p className="text-gray-700 dark:text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">{incomingNotification}</p>
+                       </div>
+                       <button 
+                           onClick={() => setIncomingNotification(null)}
+                           className="w-full mt-6 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-colors shadow-lg active:scale-95"
+                        >
+                           Ho capito
+                       </button>
+                   </div>
+               </div>
+           </div>
+        )}
+
         {activeTab === 'dashboard' && (
           <Dashboard 
             expenses={expenses} 
@@ -464,68 +589,6 @@ const App: React.FC = () => {
         )}
       </div>
     </Layout>
-  );
-};
-
-// Componente Modale per il Prompt del Budget
-const BudgetPromptModal: React.FC<{ 
-  onConfirm: (amount: number) => void; 
-  initialValue: number;
-  currency: string;
-  isNewUser: boolean;
-}> = ({ onConfirm, initialValue, currency, isNewUser }) => {
-  const [value, setValue] = useState(initialValue.toString());
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-md p-10 shadow-2xl border-4 border-emerald-500 animate-in zoom-in-95 duration-500">
-        <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600 shadow-inner">
-          <Target size={40} />
-        </div>
-        
-        <h2 className="text-3xl font-black text-gray-900 dark:text-white text-center mb-2">
-          {isNewUser ? 'Benvenuto!' : 'Nuovo Mese!'}
-        </h2>
-        
-        <p className="text-gray-500 dark:text-gray-400 text-center mb-8 font-medium">
-          {isNewUser 
-            ? `Imposta il budget personale di partenza.` 
-            : 'Pianifica le tue finanze per questo mese.'}
-        </p>
-
-        <div className="mb-8">
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3 ml-2 text-center">Budget Target</label>
-          <div className="relative">
-             <input 
-              autoFocus
-              type="number" 
-              value={value} 
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full bg-emerald-50 dark:bg-gray-700 text-gray-900 dark:text-white text-4xl font-black py-6 rounded-3xl text-center outline-none border-2 border-transparent focus:border-emerald-500 transition-all shadow-inner"
-            />
-            <span className="absolute right-8 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 text-2xl font-bold pointer-events-none opacity-50">
-              {currency}
-            </span>
-          </div>
-        </div>
-
-        <button 
-          onClick={() => onConfirm(parseFloat(value) || 0)}
-          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-200 dark:shadow-none text-lg active:scale-95"
-        >
-          Imposta Budget <ArrowRight size={20} />
-        </button>
-        
-        {!isNewUser && (
-          <button 
-            onClick={() => onConfirm(initialValue)}
-            className="w-full mt-4 py-2 text-gray-400 dark:text-gray-500 font-bold hover:text-gray-600 transition-colors text-sm"
-          >
-            Mantieni quello del mese scorso
-          </button>
-        )}
-      </div>
-    </div>
   );
 };
 

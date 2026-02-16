@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { auth } from '../services/supabase';
+import { auth, db } from '../services/supabase'; // Import db
 import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff, ShieldCheck, MailWarning } from 'lucide-react';
 
 interface AuthProps {
@@ -38,7 +38,29 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
 
     try {
       if (isLogin) {
-        await auth.signIn(email, password);
+        // 1. Esegui il login standard
+        const data = await auth.signIn(email, password);
+        
+        // 2. CHECK DI SICUREZZA BLOCCANTE: Controlla se l'utente è disabilitato
+        if (data.user) {
+            try {
+                const profile = await db.getProfile(data.user.id);
+                if (profile && profile.status === 'disabled') {
+                    // Se disabilitato, disconnetti immediatamente e lancia errore
+                    await auth.signOut();
+                    throw new Error("Account disabilitato. Contatta l'amministratore.");
+                }
+            } catch (profileErr: any) {
+                // Se l'errore è proprio "Account disabilitato", rilancialo
+                if (profileErr.message.includes('disabilitato')) {
+                    throw profileErr;
+                }
+                // Altri errori (es. profilo non trovato) non dovrebbero bloccare il login
+                console.warn("Impossibile verificare lo stato profilo:", profileErr);
+            }
+        }
+
+        // 3. Se tutto ok, procedi
         onSuccess();
       } else {
         await auth.signUp(email, password, username);

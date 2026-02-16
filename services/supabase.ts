@@ -116,7 +116,6 @@ export const auth = {
 
 export const db = {
   // PROFILES MANAGEMENT (Per Admin Dashboard)
-  // Questa funzione è CRUCIALE per l'automazione richiesta
   async upsertProfile(userId: string, email: string, name: string) {
     try {
         // Determina ruolo: admin se l'email corrisponde, altrimenti user
@@ -150,8 +149,31 @@ export const db = {
     return data || [];
   },
 
+  async getProfile(userId: string) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    // Se non trova il profilo (es. primo login di utente vecchio), non bloccare l'app
+    if (error) return null;
+    return data;
+  },
+
   async updateUserStatus(userId: string, status: 'active' | 'disabled') {
       const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
+      if (error) throw error;
+  },
+
+  async sendNotification(userId: string, message: string) {
+      // Scrive nella colonna 'notification' del profilo utente
+      const { error } = await supabase.from('profiles').update({ notification: message }).eq('id', userId);
+      if (error) throw error;
+  },
+
+  async clearNotification(userId: string) {
+      const { error } = await supabase.from('profiles').update({ notification: null }).eq('id', userId);
       if (error) throw error;
   },
 
