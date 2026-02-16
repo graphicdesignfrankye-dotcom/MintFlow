@@ -12,56 +12,9 @@ import { ExtraView } from './components/ExtraView';
 import { Auth } from './components/Auth';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig, ProfileType } from './types';
-import { Plus, Loader2, Ban, Target } from 'lucide-react';
+import { Plus, Loader2, ShieldAlert, Target, Mail, X } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
 import { format, isSameMonth } from 'date-fns';
-
-interface BudgetPromptModalProps {
-  onConfirm: (amount: number) => void;
-  initialValue: number;
-  currency: string;
-  isNewUser: boolean;
-}
-
-const BudgetPromptModal: React.FC<BudgetPromptModalProps> = ({ onConfirm, initialValue, currency, isNewUser }) => {
-  const [value, setValue] = useState(initialValue.toString());
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-8 shadow-2xl text-center animate-in zoom-in-95 border-4 border-emerald-500 relative">
-        <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
-          <Target size={40} />
-        </div>
-        <h2 className="text-2xl font-black text-gray-800 dark:text-white mb-2">
-          {isNewUser ? 'Benvenuto!' : 'Budget Mensile'}
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
-          {isNewUser 
-            ? 'Per iniziare, imposta il tuo budget mensile per tenere traccia delle tue finanze.' 
-            : 'È un nuovo mese! Confermi o modifichi il tuo budget?'}
-        </p>
-        
-        <div className="relative mb-6">
-          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xl">{currency}</span>
-          <input 
-            type="number" 
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="w-full pl-12 pr-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none font-black text-3xl dark:text-white text-center shadow-inner"
-          />
-        </div>
-
-        <button 
-          onClick={() => onConfirm(parseFloat(value) || 0)}
-          className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold text-lg hover:bg-emerald-600 transition-transform active:scale-95 shadow-lg shadow-emerald-200 dark:shadow-none"
-        >
-          Inizia a Risparmiare
-        </button>
-      </div>
-    </div>
-  );
-};
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -70,9 +23,9 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
-  const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
-  const [isBanned, setIsBanned] = useState(false);
-  const [countdown, setCountdown] = useState(120); // 2 minuti
+  
+  // STATO LOCK SCREEN: null = in controllo, true = bloccato, false = libero
+  const [isBanned, setIsBanned] = useState<boolean | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
@@ -139,67 +92,81 @@ const App: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
 
-  // GESTIONE TIMER LOGOUT PER ACCOUNT SOSPESI
+  // --- LOGICA DI SICUREZZA E REALTIME ---
   useEffect(() => {
-    if (isBanned) {
-      // Countdown visivo ogni secondo
-      const visualTimer = setInterval(() => {
-        setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
+    let channel: any;
 
-      // Logout forzato dopo 2 minuti (120000ms)
-      const logoutTimer = setTimeout(() => {
-        supabase.auth.signOut();
-        window.location.reload();
-      }, 120000);
+    const checkStatus = async (userId: string) => {
+      console.log("[Security] Controllo stato per:", userId);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('status')
+          .eq('id', userId)
+          .single();
+        
+        if (error) {
+          console.error("[Security] Errore DB:", error.message);
+          setIsBanned(false);
+          return;
+        }
 
-      return () => {
-        clearInterval(visualTimer);
-        clearTimeout(logoutTimer);
-      };
-    }
-  }, [isBanned]);
+        console.log("[Security] Stato ricevuto:", data.status);
+        // Verifica esatta: 'disabled' minuscolo
+        setIsBanned(data.status === 'disabled');
+      } catch (err) {
+        console.error("[Security] Errore critico:", err);
+        setIsBanned(false);
+      }
+    };
 
-  useEffect(() => {
-    const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session?.user) {
-        const metadata = session.user.user_metadata;
-        const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
+    // 1. Controllo iniziale immediato
+    const initCheck = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      if (currentSession?.user) {
+        const metadata = currentSession.user.user_metadata;
+        const displayName = metadata.full_name || metadata.display_name || metadata.name || currentSession.user.email?.split('@')[0] || 'Utente';
         setUserSettings(prev => ({ ...prev, name: displayName }));
-        db.upsertProfile(session.user.id, session.user.email || '', displayName);
+        await db.upsertProfile(currentSession.user.id, currentSession.user.email || '', displayName);
+        await checkStatus(currentSession.user.id);
+      } else {
+        setIsBanned(false);
       }
       setIsInitialLoading(false);
     };
-    initSession();
+    initCheck();
 
-    // IL BUTTAFUORI DI SICUREZZA
+    // 2. Monitoraggio sessione e Realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('status')
-          .eq('id', session.user.id)
-          .single();
+        await checkStatus(session.user.id);
 
-        if (profile?.status === 'disabled') {
-          setIsBanned(true); 
-          return;
-        } else {
-          setIsBanned(false);
-          setCountdown(120); // Reset countdown se l'utente è attivo
-        }
-
-        if (event === 'SIGNED_IN') {
-          const metadata = session.user.user_metadata;
-          const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
-          await db.upsertProfile(session.user.id, session.user.email || '', displayName);
-        }
+        if (channel) supabase.removeChannel(channel);
+        
+        channel = supabase
+          .channel(`status-check-${session.user.id}`)
+          .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles',
+            filter: `id=eq.${session.user.id}` 
+          }, (payload) => {
+            console.log("[Security] Realtime update:", payload.new.status);
+            setIsBanned(payload.new.status === 'disabled');
+          })
+          .subscribe();
+      } else {
+        setIsBanned(false);
+        if (channel) supabase.removeChannel(channel);
       }
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchExpenses = useCallback(async () => {
@@ -221,7 +188,7 @@ const App: React.FC = () => {
     auth.signIn('admin@mintflow.com', 'admin123').then(() => {
         window.location.reload();
     }).catch(() => {
-        alert("Credenziali admin errate o non configurate.");
+        alert("Credenziali admin errate.");
     });
   };
 
@@ -247,80 +214,85 @@ const App: React.FC = () => {
   if (session.user.email === 'admin@mintflow.com') return <AdminDashboard onLogout={() => setSession(null)} />;
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
-        {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">{successToast}</div>}
-        {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={currentBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} userSettings={userSettings} onUpdateSettings={setUserSettings} />}
-        {activeTab === 'list' && (
-          <div className="space-y-6">
-            <button onClick={() => { setPrefill(null); setShowForm(true); }} className="w-full bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg"><Plus size={20} /> Aggiungi Spesa</button>
-            <ExpenseList expenses={expenses} onDelete={id => setExpenseToDelete(id)} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
-          </div>
-        )}
-        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={w => setUserSettings(prev => ({ ...prev, wallets: w }))} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
-        {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} expenses={expenses} email={session.user.email} />}
-        {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
-        {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
-        {showForm && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-md p-8 shadow-2xl relative">
-              <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400">✕</button>
-              <h2 className="text-2xl font-bold mb-6">{prefill?.id ? 'Modifica' : 'Nuova Spesa'}</h2>
-              <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
+    <div className="relative">
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
+        <div className="max-w-4xl mx-auto px-4 py-8 pb-24 relative">
+          {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">{successToast}</div>}
+          {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={currentBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} userSettings={userSettings} onUpdateSettings={setUserSettings} />}
+          {activeTab === 'list' && (
+            <div className="space-y-6">
+              <button onClick={() => { setPrefill(null); setShowForm(true); }} className="w-full bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg transition-transform active:scale-95"><Plus size={20} /> Aggiungi Spesa</button>
+              <ExpenseList expenses={expenses} onDelete={id => setExpenseToDelete(id)} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
             </div>
-          </div>
-        )}
-      </div>
+          )}
+          {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={w => setUserSettings(prev => ({ ...prev, wallets: w }))} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
+          {activeTab === 'ai' && <AiInsights expenses={expenses} />}
+          {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} expenses={expenses} email={session.user.email} />}
+          {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
+          {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={id => setExpenseToDelete(id)} currency={userSettings.currency} />}
+          
+          {showForm && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-md p-8 shadow-2xl relative animate-in zoom-in-95 duration-200">
+                <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><X size={24} /></button>
+                <h2 className="text-2xl font-bold mb-6 dark:text-white">{prefill?.id ? 'Modifica Spesa' : 'Nuova Spesa'}</h2>
+                <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
+              </div>
+            </div>
+          )}
+        </div>
+      </Layout>
 
-      {/* Overlay Account Disabilitato (Buttafuori Grafico con Countdown) */}
-      {isBanned && (
-        <div className="fixed inset-0 z-[999] bg-white/80 dark:bg-gray-900/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-500">
-          <div className="max-w-sm w-full bg-white dark:bg-gray-800 rounded-[3rem] p-10 shadow-2xl border border-red-100 dark:border-red-900/30 text-center animate-in zoom-in-95 duration-300 relative overflow-hidden">
-            
-            {/* Barra di progresso superiore */}
-            <div 
-              className="absolute top-0 left-0 h-1.5 bg-red-500 transition-all duration-1000 ease-linear" 
-              style={{ width: `${(countdown / 120) * 100}%` }} 
-            />
-
-            <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Ban className="text-red-500" size={40} />
+      {/* --- OVERLAY LOCK SCREEN (PRIORITÀ MASSIMA) --- */}
+      {isBanned === true && (
+        <div 
+          className="fixed inset-0 z-[999999] bg-white dark:bg-gray-900 flex items-center justify-center p-6 touch-none overflow-hidden animate-in fade-in duration-300"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="absolute inset-0 bg-white/40 dark:bg-gray-900/40 backdrop-blur-2xl" />
+          
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-[3.5rem] p-12 shadow-[0_32px_64px_-15px_rgba(0,0,0,0.3)] border border-white dark:border-gray-700 text-center animate-in zoom-in-95 duration-300 relative z-10">
+            <div className="relative w-24 h-24 mx-auto mb-8">
+              <div className="absolute inset-0 bg-red-500/20 rounded-full animate-ping" />
+              <div className="relative w-full h-full bg-red-50 dark:bg-red-900/30 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-800 shadow-inner">
+                <ShieldAlert className="text-red-500" size={48} />
+              </div>
             </div>
             
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">
-              Accesso Revocato
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">
+              Accesso Sospeso
             </h2>
             
-            <p className="text-gray-500 dark:text-gray-400 font-medium mb-6 leading-relaxed">
-              L'amministratore ha disabilitato il tuo accesso. La sessione scadrà tra:
-              <span className="block text-3xl font-black text-red-500 mt-2 font-mono">
-                {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
-              </span>
+            <p className="text-gray-500 dark:text-gray-400 font-medium mb-10 leading-relaxed px-2">
+              Il tuo account è momentaneamente limitato. Per motivi di sicurezza o amministrativi, non puoi accedere ai tuoi dati finanziari in questo momento.
             </p>
 
-            <div className="space-y-3">
+            <div className="grid gap-3">
               <a 
-                href="mailto:supporto@mintflow.com" 
-                className="block w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 dark:shadow-none active:scale-95"
+                href="mailto:assistenza@mintflow.com" 
+                className="flex items-center justify-center gap-2 w-full py-5 bg-emerald-500 text-white rounded-3xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 dark:shadow-none active:scale-95"
               >
-                Contatta Supporto
+                <Mail size={20} />
+                Contatta l'Amministratore
               </a>
+              
               <button 
                 onClick={() => window.location.reload()}
-                className="w-full py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-95"
+                className="w-full py-5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-3xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-95"
               >
-                Ricarica Pagina
+                Verifica Stato Account
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-              Sessione protetta • MintFlow Security
-            </p>
+            <div className="mt-10 pt-8 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">
+                MintFlow Protection Service
+              </p>
+            </div>
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 };
 
