@@ -196,14 +196,6 @@ const App: React.FC = () => {
 
   useEffect(() => { if (session?.user?.id) fetchExpenses(); }, [session, fetchExpenses]);
 
-  const handleAdminLogin = () => {
-    auth.signIn('admin@mintflow.com', 'admin123').then(() => {
-        window.location.reload();
-    }).catch(() => {
-        alert("Credenziali admin errate.");
-    });
-  };
-
   const handleForcedLogout = async () => {
     await supabase.auth.signOut();
     window.location.reload();
@@ -266,7 +258,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!session) return <Auth onSuccess={() => setIsBanned(false)} onAdminLogin={handleAdminLogin} />;
+  if (!session) return <Auth onSuccess={() => setIsBanned(false)} />;
   if (session.user.email === 'admin@mintflow.com') return <AdminDashboard onLogout={() => setSession(null)} />;
 
   return (
@@ -300,5 +292,4 @@ const App: React.FC = () => {
   );
 };
 
-// Added missing default export
 export default App;

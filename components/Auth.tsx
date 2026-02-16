@@ -5,10 +5,9 @@ import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCir
 
 interface AuthProps {
   onSuccess: () => void;
-  onAdminLogin?: () => void;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
+export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,20 +38,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
       } finally {
         setLoading(false);
       }
-      return;
-    }
-
-    if (email === 'admin@mintflow.com' && password === 'admin123') {
-      try {
-          await auth.signIn(email, password);
-      } catch (e) {
-          console.warn("Admin non presente su DB, proseguo come Mock");
-      }
-      
-      if (onAdminLogin) {
-        onAdminLogin();
-      }
-      setLoading(false);
       return;
     }
 
@@ -136,7 +121,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
     );
   }
 
-  // --- RENDERING NORMALE DEL LOGIN (Reso esistente) ---
+  // --- RENDERING NORMALE DEL LOGIN ---
   if (resetSentEmail) {
     return (
       <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex items-center justify-center p-4">
@@ -352,11 +337,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
               {isLogin ? 'Non hai un account? Iscriviti' : 'Hai già un account? Accedi'}
             </button>
           )}
-          
-           <div className="text-[10px] text-gray-300 dark:text-gray-600 flex items-center justify-center gap-1">
-            <ShieldCheck size={12} />
-            <span>Admin Demo: admin@mintflow.com / admin123</span>
-          </div>
         </div>
       </div>
     </div>
