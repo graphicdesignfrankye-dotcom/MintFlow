@@ -28,7 +28,7 @@ const BudgetPromptModal: React.FC<BudgetPromptModalProps> = ({ onConfirm, initia
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl text-center animate-in zoom-in-95 border-4 border-emerald-500 relative">
+      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-8 shadow-2xl text-center animate-in zoom-in-95 border-4 border-emerald-500 relative">
         <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
           <Target size={40} />
         </div>
@@ -71,7 +71,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
@@ -152,29 +152,23 @@ const App: React.FC = () => {
     };
     initSession();
 
-    // IL BUTTAFUORI DI SICUREZZA
+    // IL NUOVO BUTTAFUORI DI SICUREZZA
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       if (session?.user) {
-        // Ogni volta che un utente è loggato, controlliamo il suo profilo nel DB
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('status')
           .eq('id', session.user.id)
           .single();
 
-        if (error) {
-          console.error("Errore controllo sicurezza:", error.message);
+        if (profile?.status === 'disabled') {
+          setIsBanned(true); // Attiva l'interfaccia di blocco grafico
+          // Disconnetti dopo 5 secondi per permettere di leggere il messaggio
+          setTimeout(() => supabase.auth.signOut(), 5000);
           return;
-        }
-
-        // IL BLOCCO: Se lo stato è 'disabled', forziamo il logout
-        if (profile && profile.status === 'disabled') {
-          await supabase.auth.signOut();
-          setIsDisabled(true);
-          alert("⛔ ACCOUNT DISABILITATO\n\nIl tuo accesso è stato revocato dall'amministratore.");
-          window.location.href = '/'; 
-          return;
+        } else {
+          setIsBanned(false);
         }
 
         if (event === 'SIGNED_IN') {
@@ -203,8 +197,6 @@ const App: React.FC = () => {
   useEffect(() => { if (session?.user?.id) fetchExpenses(); }, [session, fetchExpenses]);
 
   const handleAdminLogin = () => {
-    // Nota: l'admin deve loggare con email reale per essere riconosciuto dal DB
-    // Questo è solo un placeholder se l'utente clicca il tasto rapido, ma l'ID deve essere UUID valido
     auth.signIn('admin@mintflow.com', 'admin123').then(() => {
         window.location.reload();
     }).catch(() => {
@@ -229,16 +221,8 @@ const App: React.FC = () => {
   };
 
   if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center bg-mint-50"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
-  if (isDisabled) return (
-    <div className="fixed inset-0 bg-red-50 dark:bg-gray-900 z-[9999] flex flex-col items-center justify-center p-8 text-center">
-      <div className="bg-red-100 text-red-600 p-6 rounded-full mb-6"><Ban size={48} /></div>
-      <h1 className="text-3xl font-black mb-2">Account Disabilitato</h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-8">Contatta admin@mintflow.com per assistenza.</p>
-      <button onClick={() => window.location.reload()} className="px-6 py-3 bg-emerald-500 text-white rounded-xl font-bold">Riprova</button>
-    </div>
-  );
 
-  if (!session) return <Auth onSuccess={() => setIsDisabled(false)} onAdminLogin={handleAdminLogin} />;
+  if (!session) return <Auth onSuccess={() => setIsBanned(false)} onAdminLogin={handleAdminLogin} />;
   if (session.user.email === 'admin@mintflow.com') return <AdminDashboard onLogout={() => setSession(null)} />;
 
   return (
@@ -267,6 +251,44 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Overlay Account Disabilitato (Buttafuori Grafico) */}
+      {isBanned && (
+        <div className="fixed inset-0 z-[999] bg-white/80 dark:bg-gray-900/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-500">
+          <div className="max-w-sm w-full bg-white dark:bg-gray-800 rounded-[3rem] p-10 shadow-2xl border border-red-100 dark:border-red-900/30 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Ban className="text-red-500" size={40} />
+            </div>
+            
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">
+              Accesso Revocato
+            </h2>
+            
+            <p className="text-gray-500 dark:text-gray-400 font-medium mb-8 leading-relaxed">
+              Il tuo account MintFlow è stato temporaneamente <span className="text-red-500 font-bold">disabilitato</span> dall'amministratore.
+            </p>
+
+            <div className="space-y-3">
+              <a 
+                href="mailto:supporto@mintflow.com" 
+                className="block w-full py-4 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg active:scale-95"
+              >
+                Contatta Supporto
+              </a>
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-95"
+              >
+                Riprova
+              </button>
+            </div>
+
+            <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+              Codice Errore: AUTH_USER_DISABLED
+            </p>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
