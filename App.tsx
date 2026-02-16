@@ -210,8 +210,17 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       
-      // AUTOMAZIONE: QUANDO UN UTENTE FA LOGIN, FORZA LA CREAZIONE DEL PROFILO
-      if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      if (event === 'SIGNED_IN' && session?.user) {
+         // --- CONTROLLO BLOCCANTE IMMEDIATO ---
+         // Se l'utente è disabilitato, buttafuori immediato prima ancora di caricare l'interfaccia
+         const profile = await db.getProfile(session.user.id);
+         if (profile && profile.status === 'disabled') {
+            await auth.signOut();
+            setIsDisabled(true);
+            return;
+         }
+
+         // Se tutto ok, sincronizza
          const metadata = session.user.user_metadata;
          const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
          await db.upsertProfile(session.user.id, session.user.email || '', displayName);
@@ -223,6 +232,9 @@ const App: React.FC = () => {
   // --- CONTROLLO PERIODICO STATO E NOTIFICHE ADMIN ---
   useEffect(() => {
     if (!session?.user?.id) return;
+    
+    // FIX: Non controllare lo stato per l'admin simulato
+    if (session.user.id === 'mock-admin-id') return;
 
     const checkStatus = async () => {
        const profile = await db.getProfile(session.user.id);
@@ -255,6 +267,14 @@ const App: React.FC = () => {
 
   const fetchExpenses = useCallback(async () => {
     if (!session?.user?.id) return;
+
+    // FIX: Evita chiamata DB se l'utente è l'admin simulato (causa errore UUID)
+    if (session.user.id === 'mock-admin-id') {
+        setAllExpenses([]);
+        setIsLoading(false);
+        return;
+    }
+
     try {
       setIsLoading(true);
       const data = await db.getExpenses(session.user.id);
@@ -265,6 +285,13 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [session]);
+
+  // EFFETTO MANCANTE RIPRISTINATO: Carica spese quando cambia la sessione
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchExpenses();
+    }
+  }, [session, fetchExpenses]);
 
   const handleAdminLogin = () => {
     setSession({

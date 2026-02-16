@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
@@ -7,7 +6,7 @@ import {
   CreditCard, SlidersHorizontal
 } from 'lucide-react';
 import { format, isFuture } from 'date-fns';
-import { it } from 'date-fns/locale';
+import it from 'date-fns/locale/it';
 
 interface ExpenseListProps {
   expenses: Expense[];

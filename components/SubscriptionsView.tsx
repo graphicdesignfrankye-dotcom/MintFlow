@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Expense } from '../types';
 import { Repeat, Plus, Trash2, Calendar, CreditCard, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
+import it from 'date-fns/locale/it';
 
 interface SubscriptionsViewProps {
   expenses: Expense[];

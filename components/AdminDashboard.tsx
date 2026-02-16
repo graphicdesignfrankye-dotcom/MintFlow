@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Shield, Users, Bell, Trash2, Ban, Key, Search, LogOut, CheckCircle2, X, Send, AlertTriangle, Mail, Loader2, Database, Terminal, Copy, Menu } from 'lucide-react';
 import { auth, db } from '../services/supabase';
 import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
+import it from 'date-fns/locale/it';
 
 interface AdminUser {
   id: string;
@@ -87,37 +86,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     (u.display_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleToggleStatus = async (id: string) => {
+  const handleToggleStatus = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 1. BLOCCO CRITICO: Se l'ID è quello finto, non chiamare il DB per evitare errore UUID invalid
+    if (id === 'mock-admin-id') {
+        showToast("L'admin simulato non può essere modificato nel DB", 'error');
+        return;
+    }
+
     const user = users.find(u => u.id === id);
     if (!user) return;
-    if (user.id === 'mock-admin-id') return showToast("Impossibile modificare l'admin simulato", 'error');
-    
-    const newStatus = user.status === 'active' ? 'disabled' : 'active';
-    try {
-        await db.updateUserStatus(id, newStatus);
-        setUsers(users.map(u => u.id === id ? { ...u, status: newStatus } : u));
-        showToast(`Utente ${newStatus === 'active' ? 'riattivato' : 'disabilitato'} con successo`);
-    } catch (err) {
-        showToast("Errore durante l'aggiornamento stato", 'error');
-    }
-  };
 
-  const handleDeleteUser = async (id: string) => {
-    if (id === 'mock-admin-id') return showToast("Impossibile eliminare l'admin simulato", 'error');
-    if (window.confirm('Sei sicuro di voler eliminare definitivamente questo utente e tutti i suoi dati (spese incluse)? Questa azione è irreversibile.')) {
-      try {
-          await db.deleteProfile(id);
-          setUsers(users.filter(u => u.id !== id));
-          showToast('Utente e dati eliminati correttamente');
-      } catch (err: any) {
-          alert(err.message);
-          showToast('Errore eliminazione: ' + err.message, 'error');
-      }
+    const newStatus = user.status === 'active' ? 'disabled' : 'active';
+    const actionLabel = user.status === 'active' ? 'DISABILITARE' : 'RIATTIVARE';
+
+    if (window.confirm(`SEI SICURO?\n\nStai per ${actionLabel} l'utente:\n${user.display_name || user.email}`)) {
+        try {
+            await db.updateUserStatus(id, newStatus);
+            setUsers(prevUsers => prevUsers.map(u => u.id === id ? { ...u, status: newStatus } : u));
+            showToast(`Utente ${newStatus === 'active' ? 'riattivato' : 'disabilitato'} con successo`);
+        } catch (err: any) {
+            console.error("Errore DB:", err);
+            showToast("Errore durante l'aggiornamento: " + err.message, "error");
+        }
     }
   };
 
   const handleSendNotification = async () => {
     if (!notificationText.trim() || !selectedUser) return;
+    
+    // Controllo Mock ID anche qui per sicurezza
+    if (selectedUser.id === 'mock-admin-id') {
+       showToast("Non puoi inviare notifiche DB all'admin simulato", 'error');
+       return;
+    }
     
     try {
       await db.sendNotification(selectedUser.id, notificationText);
@@ -135,8 +139,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       showToast('La password deve essere di almeno 6 caratteri', 'error');
       return;
     }
-    alert("⚠️ Attenzione: Il cambio password per altri utenti richiede una Supabase Edge Function o un backend con 'Service Role'. Questa operazione è simulata nel client.");
-    showToast(`Password simulata aggiornata per ${selectedUser?.email}`);
+    // Rimosso alert nativo, usato solo Toast per UI più pulita
+    showToast(`Password simulata aggiornata per ${selectedUser?.email} (Richiede Edge Function)`);
     setShowPasswordModal(false);
     setNewPassword('');
     setSelectedUser(null);
@@ -152,7 +156,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   };
 
   const sqlImportScript = `
--- 1. Crea la tabella profiles se non esiste (con colonna notification)
+-- 1. Setup Tabella (Crea se non esiste o aggiungi colonne)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   email text,
@@ -160,10 +164,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   role text DEFAULT 'user',
   status text DEFAULT 'active',
   last_login timestamptz,
-  notification text -- Colonna per i messaggi admin
+  notification text
 );
 
--- 2. Importa utenti esistenti da Auth
+-- Assicura che le colonne esistano (in caso la tabella esistesse già senza di esse)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notification text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role text DEFAULT 'user';
+
+-- 2. Importa utenti esistenti da Auth (Idempotente)
 INSERT INTO public.profiles (id, email, display_name, last_login, role, status)
 SELECT 
     id, 
@@ -176,23 +185,36 @@ FROM auth.users
 ON CONFLICT (id) DO UPDATE 
 SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
 
--- 3. Abilita RLS (Row Level Security)
+-- 3. Configura RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- 4. Policy cleanup (Rimuove vecchie policy problematiche)
+-- 4. Rimuovi vecchie policy per evitare conflitti
 DROP POLICY IF EXISTS "Users can see own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Admin can see all" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can select all" ON public.profiles;
 DROP POLICY IF EXISTS "Admin can update all" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can delete all" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can see all" ON public.profiles;
 
--- 5. Crea Policy (Versione corretta senza ricorsione)
-CREATE POLICY "Users can see own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- 5. Crea Nuove Policy
+-- L'utente normale vede solo se stesso
+CREATE POLICY "Users can see own profile" ON public.profiles 
+FOR SELECT USING (auth.uid() = id);
 
--- NOTA: Usa l'email dal token JWT per evitare loop infiniti di lettura
-CREATE POLICY "Admin can see all" ON public.profiles FOR SELECT USING (
+-- L'admin può VEDERE tutto
+CREATE POLICY "Admin can select all" ON public.profiles 
+FOR SELECT USING (
   (auth.jwt() ->> 'email') = 'admin@mintflow.com'
 );
 
-CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
+-- L'admin può MODIFICARE tutto (Disabilitare, Notifiche)
+CREATE POLICY "Admin can update all" ON public.profiles 
+FOR UPDATE USING (
+  (auth.jwt() ->> 'email') = 'admin@mintflow.com'
+);
+
+-- L'admin può CANCELLARE tutto
+CREATE POLICY "Admin can delete all" ON public.profiles 
+FOR DELETE USING (
   (auth.jwt() ->> 'email') = 'admin@mintflow.com'
 );
   `.trim();
@@ -245,6 +267,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
               <span className="font-bold text-xs">{users.length} Utenti</span>
             </div>
              <button 
+              type="button"
               onClick={() => setShowSqlModal(true)}
               className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition-colors"
               title="Script Database"
@@ -252,6 +275,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
               <Database size={18} />
             </button>
             <button 
+              type="button"
               onClick={handleLogout}
               className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-600 dark:text-gray-300 hover:text-red-600 transition-colors rounded-xl font-bold text-xs"
             >
@@ -322,14 +346,16 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {user.email !== 'admin@mintflow.com' && (
-                        <div className="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setSelectedUser(user); setShowNotifyModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"><Bell size={18} /></button>
-                          <button onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }} className="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg"><Key size={18} /></button>
+                        // Removed opacity-50 and hover effect for better reliability on all devices
+                        <div className="flex items-center justify-end gap-2">
+                          <button type="button" onClick={() => { setSelectedUser(user); setShowNotifyModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Bell size={18} /></button>
+                          <button type="button" onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }} className="p-2 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"><Key size={18} /></button>
                           
-                          {/* PULSANTE GESTIONE STATO UTENTE */}
+                          {/* PULSANTE GESTIONE STATO UTENTE (RIMOSSO CESTINO DEFINITIVO) */}
                           {user.status === 'active' ? (
                             <button 
-                              onClick={() => handleToggleStatus(user.id)} 
+                              type="button"
+                              onClick={(e) => handleToggleStatus(user.id, e)} 
                               className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                               title="Disabilita Utente"
                             >
@@ -337,15 +363,14 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                             </button>
                           ) : (
                             <button 
-                              onClick={() => handleToggleStatus(user.id)} 
+                              type="button"
+                              onClick={(e) => handleToggleStatus(user.id, e)} 
                               className="p-2 rounded-lg text-emerald-600 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 transition-colors font-bold shadow-sm ring-1 ring-emerald-500/30"
                               title="Riattiva Utente Disabilitato"
                             >
                               <CheckCircle2 size={18} />
                             </button>
                           )}
-
-                          <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 size={18} /></button>
                         </div>
                       )}
                     </td>
@@ -382,20 +407,21 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                </div>
 
                {user.email !== 'admin@mintflow.com' && (
-                 <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <button onClick={() => { setSelectedUser(user); setShowNotifyModal(true); }} className="flex flex-col items-center justify-center p-2 rounded-xl text-blue-500 bg-blue-50 dark:bg-blue-900/10">
+                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <button type="button" onClick={() => { setSelectedUser(user); setShowNotifyModal(true); }} className="flex flex-col items-center justify-center p-2 rounded-xl text-blue-500 bg-blue-50 dark:bg-blue-900/10 active:scale-95 transition-transform">
                        <Bell size={18} />
                        <span className="text-[9px] font-bold mt-1">Notifica</span>
                     </button>
-                    <button onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }} className="flex flex-col items-center justify-center p-2 rounded-xl text-amber-500 bg-amber-50 dark:bg-amber-900/10">
+                    <button type="button" onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }} className="flex flex-col items-center justify-center p-2 rounded-xl text-amber-500 bg-amber-50 dark:bg-amber-900/10 active:scale-95 transition-transform">
                        <Key size={18} />
                        <span className="text-[9px] font-bold mt-1">Pwd</span>
                     </button>
                     
                     {/* PULSANTE MOBILE */}
                     <button 
-                        onClick={() => handleToggleStatus(user.id)} 
-                        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border ${
+                        type="button"
+                        onClick={(e) => handleToggleStatus(user.id, e)} 
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border active:scale-95 ${
                             user.status === 'active' 
                                 ? 'text-gray-500 bg-gray-100 border-transparent' 
                                 : 'text-emerald-600 bg-emerald-100 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800'
@@ -403,11 +429,6 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                     >
                        {user.status === 'active' ? <Ban size={18} /> : <CheckCircle2 size={18} />}
                        <span className="text-[9px] font-bold mt-1">{user.status === 'active' ? 'Blocca' : 'Riattiva'}</span>
-                    </button>
-
-                    <button onClick={() => handleDeleteUser(user.id)} className="flex flex-col items-center justify-center p-2 rounded-xl text-red-500 bg-red-50 dark:bg-red-900/10">
-                       <Trash2 size={18} />
-                       <span className="text-[9px] font-bold mt-1">Elimina</span>
                     </button>
                  </div>
                )}
@@ -422,7 +443,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
         </div>
       </main>
 
-      {/* Modal SQL Script (Mantenuto identico) */}
+      {/* Modal SQL Script */}
       {showSqlModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-2xl p-6 md:p-8 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
@@ -430,7 +451,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                     <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
                         <Terminal className="text-emerald-500" size={24} /> Script Manutenzione
                     </h3>
-                    <button onClick={() => setShowSqlModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                    <button type="button" onClick={() => setShowSqlModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
                 </div>
                 
                 <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-4 flex items-start gap-3">
@@ -445,8 +466,9 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                         {sqlImportScript}
                     </pre>
                     <button 
+                        type="button"
                         onClick={() => { navigator.clipboard.writeText(sqlImportScript); showToast("Copiato negli appunti!"); }}
-                        className="absolute top-2 right-2 p-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 p-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-opacity"
                         title="Copia"
                     >
                         <Copy size={16} />
@@ -454,14 +476,14 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
                 </div>
                 
                 <div className="flex justify-end gap-3 flex-wrap">
-                     <button onClick={() => setShowSqlModal(false)} className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded-xl flex-1 md:flex-none">Chiudi</button>
-                     <button onClick={() => { fetchUsers(); setShowSqlModal(false); }} className="px-6 py-3 bg-emerald-500 text-white font-bold rounded-xl flex-1 md:flex-none">Ho eseguito lo script</button>
+                     <button type="button" onClick={() => setShowSqlModal(false)} className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded-xl flex-1 md:flex-none">Chiudi</button>
+                     <button type="button" onClick={() => { fetchUsers(); setShowSqlModal(false); }} className="px-6 py-3 bg-emerald-500 text-white font-bold rounded-xl flex-1 md:flex-none">Ho eseguito lo script</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* Modal Notifica (Mantenuto identico) */}
+      {/* Modal Notifica */}
       {showNotifyModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95">
@@ -469,7 +491,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
               <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
                 <Send className="text-emerald-500" size={24} /> Invia Notifica
               </h3>
-              <button onClick={() => setShowNotifyModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+              <button type="button" onClick={() => setShowNotifyModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
             
             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl mb-4 flex items-center gap-3">
@@ -488,12 +510,12 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
               className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-emerald-500 min-h-[120px] mb-6 dark:text-white resize-none"
             />
 
-            <button onClick={handleSendNotification} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-lg active:scale-95">Invia Messaggio</button>
+            <button type="button" onClick={handleSendNotification} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-lg active:scale-95">Invia Messaggio</button>
           </div>
         </div>
       )}
 
-      {/* Modal Password (Mantenuto identico) */}
+      {/* Modal Password */}
       {showPasswordModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95">
@@ -501,7 +523,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
               <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
                 <Key className="text-amber-500" size={24} /> Reset Password
               </h3>
-              <button onClick={() => setShowPasswordModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+              <button type="button" onClick={() => setShowPasswordModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
             
             <p className="text-sm text-gray-500 mb-6">
@@ -513,7 +535,7 @@ CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING (
               <input type="password" autoFocus value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nuova Password" className="w-full pl-12 pr-4 py-4 rounded-xl bg-gray-50 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-amber-500 dark:text-white font-bold" />
             </div>
 
-            <button onClick={handleChangePassword} className="w-full py-4 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg active:scale-95">Aggiorna Password</button>
+            <button type="button" onClick={handleChangePassword} className="w-full py-4 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg active:scale-95">Aggiorna Password</button>
           </div>
         </div>
       )}

@@ -161,9 +161,17 @@ export const db = {
     return data;
   },
 
-  async updateUserStatus(userId: string, status: 'active' | 'disabled') {
-      const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
-      if (error) throw error;
+  async updateUserStatus(id: string, status: 'active' | 'disabled') {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ status: status }) // Aggiorna la colonna 'status'
+      .eq('id', id);              // Dove l'id corrisponde a quello dell'utente
+
+    if (error) {
+      console.error("Errore Supabase:", error.message);
+      throw error;
+    }
+    return data;
   },
 
   async sendNotification(userId: string, message: string) {
@@ -276,26 +284,28 @@ export const db = {
     const { data, error } = await supabase.from('expenses').update(updateData).eq('id', id).select().single();
     if (error) throw error;
     
+    const unpacked = unpackDescription(data.description);
+
     return {
       id: data.id,
       amount: data.amount,
       category: data.category,
       date: data.date,
-      description: newDesc,
-      paymentMethod: newPM,
-      isSubscription: newIsSub,
-      profile: newProfile,
-      isExtra: newIsExtra,
-      extraType: newExtraType
+      description: unpacked.desc,
+      paymentMethod: unpacked.pm,
+      isSubscription: unpacked.isSub,
+      profile: unpacked.profile,
+      isExtra: unpacked.isExtra,
+      extraType: unpacked.extraType
     };
   },
 
-  async deleteExpense(id: string): Promise<void> {
+  async deleteExpense(id: string) {
     const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) throw error;
   },
 
-  async clearAll(userId: string): Promise<void> {
+  async clearAll(userId: string) {
     const { error } = await supabase.from('expenses').delete().eq('user_id', userId);
     if (error) throw error;
   }

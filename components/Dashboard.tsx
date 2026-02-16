@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { Expense, PaymentMethod, WalletConfig, CategoryConfig, UserSettings } from '../types';
 import { 
@@ -6,7 +5,8 @@ import {
 } from 'recharts';
 import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown, SlidersHorizontal, Edit2, X, Check, Loader2, ChevronLeft } from 'lucide-react';
 import { format, isSameMonth, isFuture } from 'date-fns';
-import { it, enUS } from 'date-fns/locale';
+import it from 'date-fns/locale/it';
+import enUS from 'date-fns/locale/en-US';
 import { translations } from '../utils/i18n';
 
 // Helper functions to replace date-fns missing exports

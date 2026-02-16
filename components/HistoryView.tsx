@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Expense } from '../types';
 import { format, isSameMonth } from 'date-fns';
-import { it } from 'date-fns/locale';
+import it from 'date-fns/locale/it';
 import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers } from 'lucide-react';
 
 interface HistoryViewProps {

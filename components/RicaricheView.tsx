@@ -1,9 +1,8 @@
-
 import React, { useMemo, useState } from 'react';
 import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2, Banknote } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
 import { format, isFuture } from 'date-fns';
-import { it } from 'date-fns/locale';
+import it from 'date-fns/locale/it';
 
 interface RicaricheViewProps {
   onRefill: (wallet: WalletConfig) => void;
