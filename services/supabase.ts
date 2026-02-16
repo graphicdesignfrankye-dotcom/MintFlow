@@ -52,6 +52,15 @@ export const auth = {
       options: { data: { display_name: username }, emailRedirectTo: getRedirectUrl() }
     });
     if (error) throw error;
+    
+    // AUTOMAZIONE: Crea subito il profilo nel DB pubblico
+    if (data.user) {
+        try {
+            await db.upsertProfile(data.user.id, email, username);
+        } catch (e) {
+            console.error("Errore creazione profilo iniziale (verrà riprovato al login):", e);
+        }
+    }
     return data;
   },
   async resendConfirmation(email: string) {
@@ -70,6 +79,11 @@ export const auth = {
   async updateProfile(name: string) {
     const { data, error } = await supabase.auth.updateUser({ data: { display_name: name } });
     if (error) throw error;
+    
+    // Sync anche sulla tabella profili
+    if (data.user) {
+        await db.upsertProfile(data.user.id, data.user.email || '', name);
+    }
     return data;
   },
   async updateEmail(newEmail: string) {
@@ -85,13 +99,71 @@ export const auth = {
   async deleteAccount() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      // Cancelliamo i dati applicativi
       await db.clearAll(user.id);
+      
+      // Tentiamo di cancellare il profilo dalla tabella pubblica
+      try {
+        await supabase.from('profiles').delete().eq('id', user.id);
+      } catch (e) {
+        console.error("Errore cancellazione profilo", e);
+      }
+      
       await this.signOut();
     }
   }
 };
 
 export const db = {
+  // PROFILES MANAGEMENT (Per Admin Dashboard)
+  // Questa funzione è CRUCIALE per l'automazione richiesta
+  async upsertProfile(userId: string, email: string, name: string) {
+    try {
+        // Determina ruolo: admin se l'email corrisponde, altrimenti user
+        const role = email === 'admin@mintflow.com' ? 'admin' : 'user';
+
+        const { error } = await supabase.from('profiles').upsert({
+            id: userId,
+            email: email,
+            display_name: name,
+            last_login: new Date().toISOString(),
+            status: 'active', // Default attivo
+            role: role        // Ruolo calcolato
+        }, { onConflict: 'id' });
+        
+        if (error) {
+            console.warn("Sync Profilo: Impossibile aggiornare (RLS o tabella mancante):", error.message);
+        }
+    } catch (e) {
+        console.warn("Errore upsertProfile:", e);
+    }
+  },
+
+  async getAllProfiles() {
+    // Questa chiamata richiede che l'utente attuale abbia permessi di lettura sulla tabella profiles
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('last_login', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async updateUserStatus(userId: string, status: 'active' | 'disabled') {
+      const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
+      if (error) throw error;
+  },
+
+  async deleteProfile(userId: string) {
+      // Cancella prima le spese
+      await this.clearAll(userId);
+      // Poi il profilo pubblico
+      const { error } = await supabase.from('profiles').delete().eq('id', userId);
+      if (error) throw error;
+  },
+
+  // EXPENSES MANAGEMENT
   async getExpenses(userId: string): Promise<Expense[]> {
     const { data, error } = await supabase
       .from('expenses')

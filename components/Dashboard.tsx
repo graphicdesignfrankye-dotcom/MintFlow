@@ -202,6 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const monthsRange = eachMonthOfInterval({ start, end });
 
     return monthsRange.map(month => {
+      // 1. Calcolo somma "reale" basata sulle spese
       const monthlySum = expenses.filter(e => {
           const d = parseDate(e.date);
           if (!isSameMonth(d, month)) return false;
@@ -215,13 +216,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
           return (isStandard || isRefill) && !isAdjustment;
       }).reduce((sum, e) => sum + e.amount, 0);
 
+      // 2. Controllo se esiste un offset manuale per QUESTO mese specifico nelle impostazioni
+      let displayedValue = monthlySum;
+      
+      if (userSettings?.lastOffsetDate && userSettings?.monthlyOffset) {
+        const offsetDate = new Date(userSettings.lastOffsetDate);
+        // Se il mese del grafico coincide con il mese in cui è stato salvato l'ultimo offset
+        if (isSameMonth(month, offsetDate)) {
+           // Aggiungi l'offset al totale
+           displayedValue += userSettings.monthlyOffset;
+        }
+      }
+
       return {
         label: format(month, 'MMM', { locale: dateLocale }),
         fullLabel: format(month, 'MMMM yyyy', { locale: dateLocale }),
-        value: monthlySum
+        value: Math.max(0, displayedValue) // Evitiamo valori negativi nel grafico
       };
     });
-  }, [expenses, chartDate, dateLocale]);
+  }, [expenses, chartDate, dateLocale, userSettings]); // Aggiunto userSettings alle dipendenze
 
   const getCategoryColor = (catName: string) => categories.find(c => c.name === catName)?.color || '#9ca3af';
   const formatValue = (val: number) => `${currency}${val.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;

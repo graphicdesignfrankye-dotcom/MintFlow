@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
 import { auth } from '../services/supabase';
-import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { PiggyBank, Mail, Lock, User, Loader2, ArrowRight, Check, Send, AlertCircle, Eye, EyeOff, ShieldCheck, MailWarning } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: () => void;
+  onAdminLogin?: () => void;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
+export const Auth: React.FC<AuthProps> = ({ onSuccess, onAdminLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -23,6 +24,17 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
+    // BACKDOOR ADMIN: Permette l'accesso immediato all'admin senza registrazione reale su Supabase
+    if (email === 'admin@mintflow.com' && password === 'admin123') {
+      if (onAdminLogin) {
+        onAdminLogin();
+      } else {
+        alert("Funzionalità admin non configurata nel componente padre");
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       if (isLogin) {
@@ -60,33 +72,43 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
   if (signedUpEmail && !isLogin) {
     return (
       <div className="min-h-screen bg-mint-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl p-10 border border-emerald-100 dark:border-gray-700 text-center animate-in fade-in zoom-in-95 duration-300">
-          <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl p-8 md:p-10 border border-emerald-100 dark:border-gray-700 text-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
             <Send className="text-emerald-600 dark:text-emerald-400" size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Controlla la tua posta!</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Abbiamo inviato un link di conferma a <span className="font-bold text-emerald-600">{signedUpEmail}</span>.
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Ci siamo quasi!</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-8">
+            Abbiamo inviato un link di conferma a <br/>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-lg mt-1 inline-block">{signedUpEmail}</span>
           </p>
           
-          <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/30 text-left mb-8 flex gap-3">
-            <AlertCircle className="text-amber-500 shrink-0" size={20} />
-            <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-              <strong>Non la trovi?</strong> Controlla la cartella <strong>Spam</strong> o <strong>Promozioni</strong>. A volte i servizi gratuiti impiegano qualche minuto.
-            </p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/30 text-left mb-8 flex gap-4 shadow-sm">
+            <MailWarning className="text-amber-500 shrink-0 mt-1" size={24} />
+            <div className="space-y-2">
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                  ⚠️ Importante: Controlla lo SPAM
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                  L'email potrebbe finire nella cartella <strong>Posta Indesiderata</strong> o <strong>Promozioni</strong>.
+                </p>
+                <ul className="text-xs text-amber-700 dark:text-amber-400 list-disc pl-4 space-y-1 mt-1">
+                    <li>Cerca email provenienti da <strong>Supabase</strong>.</li>
+                    <li>Il mittente è spesso <em>noreply@supabase.co</em>.</li>
+                </ul>
+            </div>
           </div>
 
           <div className="space-y-3">
             <button
               onClick={handleResend}
               disabled={resending}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50"
             >
-              {resending ? <Loader2 className="animate-spin" size={20} /> : 'Reinvia email di conferma'}
+              {resending ? <Loader2 className="animate-spin" size={20} /> : 'Non ho ricevuto nulla, Reinvia'}
             </button>
             <button
               onClick={() => { setSignedUpEmail(null); setIsLogin(true); }}
-              className="w-full py-4 text-emerald-600 dark:text-emerald-400 font-bold hover:underline text-sm"
+              className="w-full py-4 text-emerald-600 dark:text-emerald-400 font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-2xl transition-colors text-sm"
             >
               Torna al login
             </button>
@@ -197,13 +219,19 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center space-y-4">
           <button
             onClick={() => { setIsLogin(!isLogin); setError(null); }}
-            className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline"
+            className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline block w-full"
           >
             {isLogin ? 'Non hai un account? Iscriviti' : 'Hai già un account? Accedi'}
           </button>
+          
+           {/* Admin Hint */}
+           <div className="text-[10px] text-gray-300 dark:text-gray-600 flex items-center justify-center gap-1">
+            <ShieldCheck size={12} />
+            <span>Admin Demo: admin@mintflow.com / admin123</span>
+          </div>
         </div>
       </div>
     </div>

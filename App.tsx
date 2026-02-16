@@ -11,6 +11,7 @@ import { RicaricheView } from './components/RicaricheView';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { ExtraView } from './components/ExtraView';
 import { Auth } from './components/Auth';
+import { AdminDashboard } from './components/AdminDashboard'; // Importato
 import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig, ProfileType } from './types';
 import { Plus, ScanLine, Cloud, Loader2, PiggyBank, PartyPopper, History, CheckCircle2, Trash2, AlertTriangle, Target, ArrowRight } from 'lucide-react';
 import { db, auth, supabase } from './services/supabase';
@@ -145,12 +146,27 @@ const App: React.FC = () => {
         const metadata = session.user.user_metadata;
         const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
         setUserSettings(prev => ({ ...prev, name: displayName }));
+        
+        // AUTOMAZIONE: SINCRONIZZA IL PROFILO SU DB ALL'AVVIO
+        // Questo garantisce che se l'utente esiste ma non è in tabella (es. vecchi utenti), viene aggiunto ora.
+        const nameToSync = userSettings.name !== 'Utente' ? userSettings.name : displayName;
+        db.upsertProfile(session.user.id, session.user.email || '', nameToSync);
       }
       setIsInitialLoading(false);
     };
     initSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+    // Listener per i cambi di stato (Login, Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
+      
+      // AUTOMAZIONE: QUANDO UN UTENTE FA LOGIN, FORZA LA CREAZIONE DEL PROFILO
+      if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+         const metadata = session.user.user_metadata;
+         const displayName = metadata.full_name || metadata.display_name || metadata.name || session.user.email?.split('@')[0] || 'Utente';
+         // Chiamata asincrona al DB per assicurarsi che il profilo esista per l'admin
+         await db.upsertProfile(session.user.id, session.user.email || '', displayName);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -173,6 +189,17 @@ const App: React.FC = () => {
       fetchExpenses();
     }
   }, [session, fetchExpenses]);
+
+  const handleAdminLogin = () => {
+    setSession({
+      user: {
+        id: 'mock-admin-id',
+        email: 'admin@mintflow.com',
+        user_metadata: { full_name: 'Super Admin', name: 'Super Admin' }
+      }
+    });
+    setIsInitialLoading(false);
+  };
 
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id'>) => {
     try {
@@ -339,7 +366,20 @@ const App: React.FC = () => {
   };
 
   if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center bg-mint-50"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
-  if (!session) return <Auth onSuccess={() => {}} />;
+  
+  if (!session) {
+    return (
+      <Auth 
+        onSuccess={() => {}} 
+        onAdminLogin={handleAdminLogin} 
+      />
+    );
+  }
+
+  // CONTROL ADMINISTRATOR - REDIRECT TO ADMIN DASHBOARD
+  if (session.user.email === 'admin@mintflow.com') {
+    return <AdminDashboard />;
+  }
 
   return (
     <Layout 
