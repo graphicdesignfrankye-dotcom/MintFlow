@@ -72,6 +72,7 @@ const App: React.FC = () => {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
+  const [countdown, setCountdown] = useState(120); // 2 minuti
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
@@ -138,6 +139,27 @@ const App: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
 
+  // GESTIONE TIMER LOGOUT PER ACCOUNT SOSPESI
+  useEffect(() => {
+    if (isBanned) {
+      // Countdown visivo ogni secondo
+      const visualTimer = setInterval(() => {
+        setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+
+      // Logout forzato dopo 2 minuti (120000ms)
+      const logoutTimer = setTimeout(() => {
+        supabase.auth.signOut();
+        window.location.reload();
+      }, 120000);
+
+      return () => {
+        clearInterval(visualTimer);
+        clearTimeout(logoutTimer);
+      };
+    }
+  }, [isBanned]);
+
   useEffect(() => {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -152,7 +174,7 @@ const App: React.FC = () => {
     };
     initSession();
 
-    // IL NUOVO BUTTAFUORI DI SICUREZZA
+    // IL BUTTAFUORI DI SICUREZZA
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       if (session?.user) {
@@ -163,12 +185,11 @@ const App: React.FC = () => {
           .single();
 
         if (profile?.status === 'disabled') {
-          setIsBanned(true); // Attiva l'interfaccia di blocco grafico
-          // Disconnetti dopo 5 secondi per permettere di leggere il messaggio
-          setTimeout(() => supabase.auth.signOut(), 5000);
+          setIsBanned(true); 
           return;
         } else {
           setIsBanned(false);
+          setCountdown(120); // Reset countdown se l'utente è attivo
         }
 
         if (event === 'SIGNED_IN') {
@@ -252,10 +273,17 @@ const App: React.FC = () => {
         )}
       </div>
 
-      {/* Overlay Account Disabilitato (Buttafuori Grafico) */}
+      {/* Overlay Account Disabilitato (Buttafuori Grafico con Countdown) */}
       {isBanned && (
         <div className="fixed inset-0 z-[999] bg-white/80 dark:bg-gray-900/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-500">
-          <div className="max-w-sm w-full bg-white dark:bg-gray-800 rounded-[3rem] p-10 shadow-2xl border border-red-100 dark:border-red-900/30 text-center animate-in zoom-in-95 duration-300">
+          <div className="max-w-sm w-full bg-white dark:bg-gray-800 rounded-[3rem] p-10 shadow-2xl border border-red-100 dark:border-red-900/30 text-center animate-in zoom-in-95 duration-300 relative overflow-hidden">
+            
+            {/* Barra di progresso superiore */}
+            <div 
+              className="absolute top-0 left-0 h-1.5 bg-red-500 transition-all duration-1000 ease-linear" 
+              style={{ width: `${(countdown / 120) * 100}%` }} 
+            />
+
             <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
               <Ban className="text-red-500" size={40} />
             </div>
@@ -264,14 +292,17 @@ const App: React.FC = () => {
               Accesso Revocato
             </h2>
             
-            <p className="text-gray-500 dark:text-gray-400 font-medium mb-8 leading-relaxed">
-              Il tuo account MintFlow è stato temporaneamente <span className="text-red-500 font-bold">disabilitato</span> dall'amministratore.
+            <p className="text-gray-500 dark:text-gray-400 font-medium mb-6 leading-relaxed">
+              L'amministratore ha disabilitato il tuo accesso. La sessione scadrà tra:
+              <span className="block text-3xl font-black text-red-500 mt-2 font-mono">
+                {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+              </span>
             </p>
 
             <div className="space-y-3">
               <a 
                 href="mailto:supporto@mintflow.com" 
-                className="block w-full py-4 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg active:scale-95"
+                className="block w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 dark:shadow-none active:scale-95"
               >
                 Contatta Supporto
               </a>
@@ -279,12 +310,12 @@ const App: React.FC = () => {
                 onClick={() => window.location.reload()}
                 className="w-full py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-95"
               >
-                Riprova
+                Ricarica Pagina
               </button>
             </div>
 
             <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-              Codice Errore: AUTH_USER_DISABLED
+              Sessione protetta • MintFlow Security
             </p>
           </div>
         </div>
