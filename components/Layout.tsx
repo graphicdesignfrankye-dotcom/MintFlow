@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft, Bell, X, Trash2, Mail } from 'lucide-react';
+import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft, Bell, X, Trash2, Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { translations } from '../utils/i18n';
 import { ProfileType, AppNotification } from '../types';
 import { supabase, db } from '../services/supabase';
+import { ConfirmModal } from './ConfirmModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotifListOpen, setIsNotifListOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(null);
+  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+  
+  // Stato per il modal di conferma eliminazione
+  const [confirmDelete, setConfirmDelete] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     const fetchAndSubscribe = async () => {
@@ -54,16 +64,37 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     }
   };
 
-  const handleDeleteNotif = async (id: string) => {
-    if (confirm("Vuoi eliminare questa notifica?")) {
-      await db.deleteNotification(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      setSelectedNotif(null);
+  const requestDeleteNotif = (id: string) => {
+    setConfirmDelete({ isOpen: true, id });
+  };
+
+  const executeDeleteNotif = async () => {
+    if (confirmDelete.id) {
+      try {
+        await db.deleteNotification(confirmDelete.id);
+        setNotifications(prev => prev.filter(n => n.id !== confirmDelete.id));
+        showToast("Messaggio eliminato definitivamente", 'success');
+        setSelectedNotif(null);
+      } catch (err: any) {
+        showToast("Errore eliminazione: " + err.message, 'error');
+      } finally {
+        setConfirmDelete({ isOpen: false, id: null });
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4 ${
+          toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-500 text-white'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+          <span className="font-bold text-sm">{toast.msg}</span>
+        </div>
+      )}
+
       {/* Header Desktop */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-gray-800">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -154,7 +185,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 Chiudi
               </button>
               <button 
-                onClick={() => handleDeleteNotif(selectedNotif.id)}
+                onClick={() => requestDeleteNotif(selectedNotif.id)}
                 className="flex-1 py-4 bg-red-50 text-red-500 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-all active:scale-95"
               >
                 <Trash2 size={18} /> Cancella
@@ -163,6 +194,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
         </div>
       )}
+
+      {/* Modal Conferma Eliminazione */}
+      <ConfirmModal 
+        isOpen={confirmDelete.isOpen}
+        title="Elimina Notifica"
+        message="Sei sicuro di voler eliminare questo messaggio? L'azione è irreversibile."
+        onConfirm={executeDeleteNotif}
+        onCancel={() => setConfirmDelete({ isOpen: false, id: null })}
+        confirmText="Elimina"
+        type="danger"
+      />
 
       <main>{children}</main>
 

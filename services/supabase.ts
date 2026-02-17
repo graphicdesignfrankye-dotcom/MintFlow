@@ -72,20 +72,17 @@ export const auth = {
     if (error) throw error;
     return data;
   },
-  // Fix: Added missing updateEmail method
   async updateEmail(email: string) {
     const { data, error } = await supabase.auth.updateUser({ email });
     if (error) throw error;
     return data;
   },
-  // Fix: Added missing resetPassword method
   async resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
     });
     if (error) throw error;
   },
-  // Fix: Added missing resendConfirmation method
   async resendConfirmation(email: string) {
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -93,10 +90,7 @@ export const auth = {
     });
     if (error) throw error;
   },
-  // Fix: Added missing deleteAccount method (Simulation via SignOut)
   async deleteAccount() {
-    // User self-deletion is not directly supported via Supabase client SDK for security reasons.
-    // In a real app, this would typically be handled via a Supabase Edge Function or an API endpoint.
     await supabase.auth.signOut();
   }
 };
@@ -146,7 +140,8 @@ export const db = {
   },
 
   async deleteNotification(id: string) {
-    await supabase.from('notifications').delete().eq('id', id);
+    const { error } = await supabase.from('notifications').delete().eq('id', id);
+    if (error) throw error;
   },
 
   async getExpenses(userId: string): Promise<Expense[]> {
