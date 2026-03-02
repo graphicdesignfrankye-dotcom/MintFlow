@@ -3,10 +3,10 @@ import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
 import { 
   Trash2, Search, Filter, Edit2, AlertCircle, 
   Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils,
-  CreditCard, SlidersHorizontal
+  CreditCard, SlidersHorizontal, CloudOff
 } from 'lucide-react';
-import { format, isFuture } from 'date-fns';
-import it from 'date-fns/locale/it';
+import { format, isFuture, isBefore, startOfMonth } from 'date-fns';
+import { it } from 'date-fns/locale/it';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -24,6 +24,23 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
 
   const filteredExpenses = expenses
     .filter(e => {
+      const [y, m, d] = e.date.split('-').map(Number);
+      const expenseDate = new Date(y, m - 1, d);
+      const currentMonthStart = startOfMonth(new Date());
+      
+      // FILTRO 0: Nascondi le spese dei mesi passati (verranno mostrate nello storico)
+      // ECCETTO gli abbonamenti ATTIVI (del mese corrente o futuri)
+      const isSubscription = e.isSubscription || e.category === 'Abbonamenti';
+      
+      if (isSubscription) {
+        // Se è un abbonamento, mostralo SOLO se è del mese corrente o futuro
+        // (Quelli passati sono stati convertiti in spese normali o devono essere nascosti se ancora flaggati come sub)
+        if (isBefore(expenseDate, currentMonthStart)) return false;
+      } else {
+        // Se è una spesa normale, nascondila se è passata
+        if (isBefore(expenseDate, currentMonthStart)) return false;
+      }
+
       // FILTRO 1: Nascondi SEMPRE gli aggiustamenti/modifiche tecniche dalla lista
       // Queste sono operazioni di sistema sui saldi, non spese reali.
       const desc = e.description.toLowerCase();
@@ -42,7 +59,11 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
       
       return matchesSearch && matchesCategory && matchesMethod;
     })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => {
+      const [yA, mA, dA] = a.date.split('-').map(Number);
+      const [yB, mB, dB] = b.date.split('-').map(Number);
+      return new Date(yB, mB - 1, dB).getTime() - new Date(yA, mA - 1, dA).getTime();
+    });
 
   // Funzione per ottenere l'icona in base alla categoria
   const getCategoryIcon = (categoryName: string) => {
@@ -112,13 +133,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
         {filteredExpenses.length > 0 ? (
           <div className="divide-y divide-emerald-50 dark:divide-gray-700">
             {filteredExpenses.map((expense) => {
-              const expenseDate = new Date(expense.date);
+              const [y, m, d] = expense.date.split('-').map(Number);
+              const expenseDate = new Date(y, m - 1, d);
               const isDateInFuture = isFuture(expenseDate);
 
               return (
                 <div 
                   key={expense.id} 
-                  className={`p-4 flex items-center justify-between hover:bg-emerald-50/30 dark:hover:bg-gray-700/30 transition-colors ${isDateInFuture ? 'bg-red-50/20' : ''}`}
+                  className={`p-4 flex items-center justify-between hover:bg-emerald-50/30 dark:hover:bg-gray-700/30 transition-colors ${isDateInFuture ? 'bg-red-50/40 dark:bg-red-900/10' : ''}`}
                 >
                   <div className="flex items-center gap-3 md:gap-4 overflow-hidden flex-1 min-w-0">
                     <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center font-bold transition-colors ${
@@ -130,8 +152,13 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                     </div>
                     
                     <div className="overflow-hidden min-w-0 flex-1">
-                      <h4 className="font-semibold text-gray-800 dark:text-white truncate text-sm md:text-base pr-2">
+                      <h4 className={`font-semibold truncate text-sm md:text-base pr-2 flex items-center gap-2 ${isDateInFuture ? 'text-red-700 dark:text-red-300' : 'text-gray-800 dark:text-white'}`}>
                         {expense.description}
+                        {expense._isLocal && (
+                          <span className="text-orange-500 bg-orange-100 dark:bg-orange-900/30 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold flex items-center gap-1">
+                            <CloudOff size={10} /> Locale
+                          </span>
+                        )}
                       </h4>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-medium text-gray-400">
                         {isDateInFuture && <AlertCircle size={10} className="text-red-500" />}
@@ -145,9 +172,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                   </div>
                   
                   <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <span className={`font-bold text-base md:text-lg whitespace-nowrap ${isDateInFuture ? 'text-red-500' : 'text-gray-800 dark:text-white'}`}>
-                      {currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className={`font-bold text-base md:text-lg whitespace-nowrap ${isDateInFuture ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-white'}`}>
+                        {currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                      </span>
+                      {isDateInFuture && (
+                        <span className="text-[9px] font-bold text-red-500 uppercase tracking-tighter">In programma</span>
+                      )}
+                    </div>
                     
                     <div className="flex items-center bg-gray-50 dark:bg-gray-700/50 rounded-full p-1 border border-gray-100 dark:border-gray-600">
                       <button 

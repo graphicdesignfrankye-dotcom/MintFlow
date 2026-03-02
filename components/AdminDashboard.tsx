@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Bell, Ban, Search, LogOut, CheckCircle2, X, Send, AlertTriangle, Loader2, Database, Terminal, Key, Check, Mail } from 'lucide-react';
+import { Shield, Users, Bell, Ban, Search, LogOut, CheckCircle2, X, Send, AlertTriangle, Loader2, Database, Terminal, Key, Check, Mail, RotateCw } from 'lucide-react';
 import { db, auth, supabase } from '../services/supabase';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -34,6 +34,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [userToReset, setUserToReset] = useState<{email: string, id: string} | null>(null);
   const [isResetting, setIsResetting] = useState(false);
 
+  // Gestione SQL
+  const [showSqlModal, setShowSqlModal] = useState(false);
+
   // Gestione Stato
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean; userId: string; userName: string; newStatus: 'active' | 'disabled';
@@ -42,8 +45,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
+        // Forza il refresh della sessione per aggiornare il JWT (utile se il ruolo è cambiato nel DB)
+        await supabase.auth.refreshSession();
         const data = await db.getAllProfiles();
         setUsers(data as AdminUser[]);
+        showToast("Dati e sessione aggiornati!");
     } catch (err: any) {
         showToast("Errore caricamento utenti", "error");
     } finally {
@@ -113,6 +119,93 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     (u.display_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const sqlImportScript = `
+-- 1. Crea la tabella profiles se non esiste (con colonna settings per sincronizzazione)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  email text,
+  display_name text,
+  role text DEFAULT 'user',
+  status text DEFAULT 'active',
+  last_login timestamptz,
+  settings jsonb DEFAULT '{}'::jsonb,
+  notification text
+);
+
+-- 2. Aggiungi colonna settings se non esiste (per chi ha già la tabella)
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='settings') THEN
+    ALTER TABLE public.profiles ADD COLUMN settings jsonb DEFAULT '{}'::jsonb;
+  END IF;
+END $$;
+
+-- 3. Crea la tabella expenses se non esiste
+CREATE TABLE IF NOT EXISTS public.expenses (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  amount numeric NOT NULL,
+  category text NOT NULL,
+  date timestamptz NOT NULL,
+  description text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- 4. Crea la tabella notifications se non esiste
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  title text NOT NULL,
+  message text NOT NULL,
+  is_read boolean DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+
+-- 5. Crea Indici per performance
+CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON public.expenses(user_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON public.expenses(date DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+
+-- 6. Abilita RLS (Row Level Security)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- 6. Policy Profiles
+DROP POLICY IF EXISTS "Users can see own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can see all" ON public.profiles;
+DROP POLICY IF EXISTS "Admin can update all" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+
+CREATE POLICY "Users can see own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Admin can see all" ON public.profiles FOR SELECT USING ((auth.jwt() ->> 'email') = 'admin@mintflow.com');
+CREATE POLICY "Admin can update all" ON public.profiles FOR UPDATE USING ((auth.jwt() ->> 'email') = 'admin@mintflow.com');
+
+-- 7. Policy Expenses
+DROP POLICY IF EXISTS "Users can manage own expenses" ON public.expenses;
+CREATE POLICY "Users can manage own expenses" ON public.expenses FOR ALL USING (auth.uid() = user_id);
+
+-- 8. Policy Notifications
+DROP POLICY IF EXISTS "Users can see own notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Admin can send notifications" ON public.notifications;
+CREATE POLICY "Users can see own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admin can send notifications" ON public.notifications FOR INSERT WITH CHECK ((auth.jwt() ->> 'email') = 'admin@mintflow.com');
+
+-- 9. Importa utenti esistenti da Auth in Profiles
+INSERT INTO public.profiles (id, email, display_name, last_login, role, status)
+SELECT 
+    id, 
+    email, 
+    COALESCE(raw_user_meta_data->>'display_name', split_part(email, '@', 1)),
+    COALESCE(last_sign_in_at, created_at),
+    CASE WHEN email = 'admin@mintflow.com' THEN 'admin' ELSE 'user' END,
+    'active'
+FROM auth.users
+ON CONFLICT (id) DO UPDATE 
+SET email = EXCLUDED.email, last_login = EXCLUDED.last_login;
+  `.trim();
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white pb-24 md:pb-12">
       {toast && (
@@ -130,9 +223,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <Shield className="text-emerald-500" size={24} />
             <h1 className="text-lg md:text-xl font-black">MintFlow <span className="text-emerald-500 hidden sm:inline">Admin</span></h1>
           </div>
-          <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl font-bold text-xs md:text-sm">
-            <LogOut size={18} /> <span className="hidden sm:inline">Esci</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => fetchUsers()}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50 font-bold text-xs"
+              title="Aggiorna Lista"
+            >
+              <RotateCw size={18} className={loading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Aggiorna</span>
+            </button>
+            <button 
+              onClick={() => { fetchUsers(); setShowSqlModal(true); }}
+              className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition-colors"
+              title="Script Database"
+            >
+              <Database size={18} />
+            </button>
+            <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl font-bold text-xs md:text-sm">
+              <LogOut size={18} /> <span className="hidden sm:inline">Esci</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -271,6 +382,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         onConfirm={handleToggleStatus}
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Modal SQL Script */}
+      {showSqlModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-2xl p-6 md:p-8 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                        <Terminal className="text-emerald-500" size={24} /> Script Manutenzione
+                    </h3>
+                    <button onClick={() => setShowSqlModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                </div>
+                
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-4 flex items-start gap-3">
+                    <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                        Esegui questo script nel <strong>Supabase SQL Editor</strong> per configurare il database correttamente (inclusa la sincronizzazione portafogli).
+                    </p>
+                </div>
+
+                <div className="bg-gray-900 p-4 rounded-xl mb-4 relative group">
+                    <pre className="text-xs text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap">
+                        {sqlImportScript}
+                    </pre>
+                    <button 
+                        onClick={() => { navigator.clipboard.writeText(sqlImportScript); showToast("Copiato negli appunti!"); }}
+                        className="absolute top-2 right-2 p-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 opacity-100 transition-opacity"
+                        title="Copia"
+                    >
+                        <Terminal size={16} />
+                    </button>
+                </div>
+                
+                <div className="flex justify-end gap-3 flex-wrap">
+                     <button onClick={() => setShowSqlModal(false)} className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded-xl flex-1 md:flex-none">Chiudi</button>
+                     <button onClick={() => { fetchUsers(); setShowSqlModal(false); }} className="px-6 py-3 bg-emerald-500 text-white font-bold rounded-xl flex-1 md:flex-none">Ho eseguito lo script</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

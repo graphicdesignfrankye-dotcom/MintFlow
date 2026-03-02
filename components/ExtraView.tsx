@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Expense, PaymentMethod } from '../types';
 import { ArrowUpRight, ArrowDownLeft, Trash2, Plus, X, Check, Loader2, Info } from 'lucide-react';
 import { format } from 'date-fns';
-import it from 'date-fns/locale/it';
+import { it } from 'date-fns/locale/it';
 
 interface ExtraViewProps {
   expenses: Expense[];

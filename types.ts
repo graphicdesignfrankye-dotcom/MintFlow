@@ -30,6 +30,7 @@ export interface Expense {
   profile?: ProfileType; 
   isExtra?: boolean; // Nuovo: Indica se è una spesa Extra
   extraType?: 'given' | 'received'; // Nuovo: Dato o Ricevuto
+  _isLocal?: boolean; // Flag per indicare se la spesa è salvata solo localmente (non sincronizzata)
 }
 
 export interface WalletConfig {

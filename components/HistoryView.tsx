@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Expense } from '../types';
-import { format, isSameMonth } from 'date-fns';
-import it from 'date-fns/locale/it';
-import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers } from 'lucide-react';
+import { format, isSameMonth, isFuture } from 'date-fns';
+import { it } from 'date-fns/locale/it';
+import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils } from 'lucide-react';
 
 interface HistoryViewProps {
   expenses: Expense[];
@@ -22,6 +22,8 @@ interface YearGroup {
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, currency }) => {
+  const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
+
   const parseDate = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d);
@@ -69,6 +71,132 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
     return groups;
   }, [expenses]);
 
+  const getCategoryIcon = (categoryName: string) => {
+    const lower = categoryName.toLowerCase();
+    if (lower.includes('sigarett') || lower.includes('tabacco') || lower.includes('iqos')) return <Cigarette size={20} />;
+    if (lower.includes('benzina') || lower.includes('diesel') || lower.includes('carburante')) return <Fuel size={20} />;
+    if (lower.includes('autostrada') || lower.includes('auto') || lower.includes('parcheggio') || lower.includes('telepass')) return <Car size={20} />;
+    if (lower.includes('ricarica') || lower.includes('luce') || lower.includes('energia')) return <Zap size={20} />;
+    if (lower.includes('svago') || lower.includes('cinema') || lower.includes('gioc') || lower.includes('bar')) return <Gamepad2 size={20} />;
+    if (lower.includes('salute') || lower.includes('farmacia') || lower.includes('medic') || lower.includes('dott')) return <Heart size={20} />;
+    if (lower.includes('abbonament') || lower.includes('netflix') || lower.includes('spotify') || lower.includes('sub')) return <Repeat size={20} />;
+    if (lower.includes('cibo') || lower.includes('ristorant') || lower.includes('pranzo') || lower.includes('cena') || lower.includes('spesa')) return <Utensils size={20} />;
+    return <ShoppingBag size={20} />;
+  };
+
+  const monthExpenses = React.useMemo(() => {
+    if (!selectedMonth) return [];
+    return expenses
+      .filter(e => isSameMonth(parseDate(e.date), selectedMonth))
+      .filter(e => {
+        const desc = e.description.toLowerCase();
+        return !(desc.includes('aggiustamento') || desc.includes('modifica saldo') || (desc.includes('modifica') && desc.includes('contanti')));
+      })
+      .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
+  }, [expenses, selectedMonth]);
+
+  const exportToCSV = () => {
+    if (!expenses || expenses.length === 0) return;
+    
+    const headers = ['Data', 'Descrizione', 'Categoria', 'Metodo di Pagamento', 'Importo'];
+    const csvContent = [
+      headers.join(','),
+      ...expenses.map(e => {
+        const date = format(parseDate(e.date), 'dd/MM/yyyy');
+        const desc = `"${e.description.replace(/"/g, '""')}"`;
+        const category = `"${e.category}"`;
+        const method = `"${e.paymentMethod}"`;
+        const amount = e.amount.toString().replace('.', ',');
+        return [date, desc, category, method, amount].join(',');
+      })
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export_spese_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (selectedMonth) {
+    return (
+      <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
+        <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+          <header className="flex items-center justify-between mb-8">
+            <button 
+              onClick={() => setSelectedMonth(null)}
+              className="p-2 hover:bg-emerald-50 dark:hover:bg-gray-800 rounded-full text-emerald-600 transition-colors"
+            >
+              <ChevronLeft size={28} />
+            </button>
+            <div className="text-center flex flex-col items-center">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
+                {format(selectedMonth, 'MMMM yyyy', { locale: it })}
+              </h1>
+              <p className="text-gray-500 text-sm font-medium">{monthExpenses.length} transazioni</p>
+            </div>
+            <div className="w-10"></div>
+          </header>
+
+          <div className="bg-white dark:bg-gray-800 rounded-[2rem] border border-emerald-100 dark:border-gray-700 overflow-hidden shadow-sm">
+            {monthExpenses.length > 0 ? (
+              <div className="divide-y divide-emerald-50 dark:divide-gray-700">
+                {monthExpenses.map((expense) => {
+                  const expenseDate = parseDate(expense.date);
+                  const isDateInFuture = isFuture(expenseDate);
+                  return (
+                    <div key={expense.id} className={`p-4 flex items-center justify-between hover:bg-emerald-50/30 dark:hover:bg-gray-700/30 transition-colors ${isDateInFuture ? 'bg-red-50/40 dark:bg-red-900/10' : ''}`}>
+                      <div className="flex items-center gap-3 md:gap-4 overflow-hidden flex-1 min-w-0">
+                        <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center font-bold transition-colors ${
+                          isDateInFuture 
+                            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
+                            : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        }`}>
+                          {getCategoryIcon(expense.category)}
+                        </div>
+                        <div className="overflow-hidden min-w-0 flex-1">
+                          <h4 className={`font-semibold truncate text-sm md:text-base pr-2 ${isDateInFuture ? 'text-red-700 dark:text-red-300' : 'text-gray-800 dark:text-white'}`}>
+                            {expense.description}
+                          </h4>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-medium text-gray-400">
+                            <span className={`whitespace-nowrap ${isDateInFuture ? 'text-red-500' : ''}`}>{format(expenseDate, 'dd MMM yyyy', { locale: it })}</span>
+                            <span>•</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 truncate">{expense.category}</span>
+                            <span>•</span>
+                            <span className="truncate">{expense.paymentMethod}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-2">
+                        <div className="flex flex-col items-end">
+                          <span className={`font-bold text-base md:text-lg whitespace-nowrap ${isDateInFuture ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-white'}`}>
+                            {currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                          </span>
+                          {isDateInFuture && (
+                            <span className="text-[9px] font-bold text-red-500 uppercase tracking-tighter">In programma</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-12 text-center">
+                <p className="text-gray-400 font-medium">Nessuna spesa trovata per questo mese.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
@@ -103,9 +231,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
                 
                 <div className="grid grid-cols-1 gap-3">
                   {group.months.map((data) => (
-                    <div 
+                    <button 
                       key={data.month.toISOString()}
-                      className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm flex items-center justify-between group hover:border-emerald-300 transition-all"
+                      onClick={() => setSelectedMonth(data.month)}
+                      className="w-full text-left bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm flex items-center justify-between group hover:border-emerald-300 transition-all"
                     >
                       <div className="flex items-center gap-4">
                         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-2xl text-gray-400 group-hover:text-emerald-500 transition-colors">
@@ -122,11 +251,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
                         <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                           {currency}{data.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                         </p>
-                        <div className="flex items-center justify-end gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                          Chiuso <ArrowRight size={10} />
+                        <div className="flex items-center justify-end gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 group-hover:text-emerald-500 transition-colors">
+                          Vedi Dettagli <ArrowRight size={10} />
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -150,7 +279,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
           <p className="text-emerald-50 text-sm mb-6 leading-relaxed">
             Vuoi un backup completo? Scarica l'intero database delle tue transazioni in formato CSV.
           </p>
-          <button className="w-full py-4 bg-white text-emerald-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all">
+          <button 
+            onClick={exportToCSV}
+            className="w-full py-4 bg-white text-emerald-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all"
+          >
             Genera CSV Completo
           </button>
         </div>

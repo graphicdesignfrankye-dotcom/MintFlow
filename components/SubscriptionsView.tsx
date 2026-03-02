@@ -1,19 +1,70 @@
 import React, { useMemo } from 'react';
 import { Expense } from '../types';
-import { Repeat, Plus, Trash2, Calendar, CreditCard, ChevronRight } from 'lucide-react';
+import { Repeat, Plus, Trash2, Calendar, CreditCard, ChevronRight, Edit2 } from 'lucide-react';
 import { format } from 'date-fns';
-import it from 'date-fns/locale/it';
+import { it } from 'date-fns/locale/it';
 
 interface SubscriptionsViewProps {
   expenses: Expense[];
   onAddSub: () => void;
+  onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
   currency: string;
+  onSyncAll?: () => void;
 }
 
-export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, onAddSub, onDelete, currency }) => {
+export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, onAddSub, onEdit, onDelete, currency, onSyncAll }) => {
   const subscriptions = useMemo(() => {
-    return expenses.filter(e => e.isSubscription || e.category === 'Abbonamenti');
+    // Mostra solo gli abbonamenti che sono attivi (isSubscription: true O categoria Abbonamenti)
+    // E che sono del mese corrente o futuri
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+    return expenses.filter(e => {
+      const isSub = e.isSubscription || e.category === 'Abbonamenti';
+      if (!isSub) return false;
+      
+      const [y, m] = e.date.split('-').map(Number);
+      const expenseMonthStr = `${y}-${String(m).padStart(2, '0')}`;
+      
+      // Includi se è del mese corrente o futuro
+      return expenseMonthStr >= currentMonthStr;
+    });
+  }, [expenses]);
+
+  const hasPastSubscriptions = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    
+    // Cerca tra TUTTE le spese (non solo quelle filtrate)
+    // Cerchiamo abbonamenti dei mesi passati che non sono ancora stati portati al mese corrente
+    const allSubs = expenses.filter(e => e.isSubscription || e.category === 'Abbonamenti');
+    
+    // Abbonamenti già presenti nel mese corrente
+    const currentMonthSubsDescriptions = new Set(
+      allSubs
+        .filter(e => {
+          const [y, m] = e.date.split('-').map(Number);
+          return `${y}-${String(m).padStart(2, '0')}` === currentMonthStr;
+        })
+        .map(e => e.description.toLowerCase().trim())
+    );
+
+    // Controlla se c'è almeno un abbonamento passato che manca nel mese corrente
+    return allSubs.some(s => {
+      const [y, m] = s.date.split('-').map(Number);
+      const expenseMonthStr = `${y}-${String(m).padStart(2, '0')}`;
+      
+      // Se è del mese corrente o futuro, non ci interessa per questo check
+      if (expenseMonthStr >= currentMonthStr) return false;
+
+      // Se è passato, controlliamo se esiste già nel mese corrente
+      return !currentMonthSubsDescriptions.has(s.description.toLowerCase().trim());
+    });
   }, [expenses]);
 
   const monthlyTotal = subscriptions.reduce((sum, s) => sum + s.amount, 0);
@@ -32,10 +83,19 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, 
         </div>
         <button 
           onClick={onAddSub}
-          className="w-full bg-white text-emerald-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all active:scale-95"
+          className="w-full bg-white text-emerald-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all active:scale-95 mb-3"
         >
           <Plus size={20} /> Registra Nuovo Abbonamento
         </button>
+
+        {hasPastSubscriptions && onSyncAll && (
+          <button 
+            onClick={onSyncAll}
+            className="w-full bg-emerald-400/20 text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-400/30 transition-all active:scale-95 border border-white/20"
+          >
+            <Repeat size={18} /> Aggiorna al mese corrente
+          </button>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -58,19 +118,26 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({ expenses, 
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <p className="font-black text-gray-800 dark:text-white text-lg leading-none">{currency}{sub.amount.toFixed(2)}</p>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">Al mese</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right mr-2">
+                      <p className="font-black text-gray-800 dark:text-white text-lg leading-none">{currency}{sub.amount.toFixed(2)}</p>
+                      <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">Al mese</p>
+                    </div>
+                    <button 
+                      onClick={() => onEdit(sub)}
+                      className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-full transition-all active:bg-emerald-100"
+                      title="Modifica abbonamento"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button 
+                      onClick={() => onDelete(sub.id)}
+                      className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all active:bg-red-100"
+                      title="Elimina abbonamento"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => onDelete(sub.id)}
-                    className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all active:bg-red-100"
-                    title="Elimina abbonamento"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
               </div>
             ))}
           </div>

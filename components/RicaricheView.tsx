@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Zap, Wallet, Fuel, Plus, Clock, Info, CreditCard, Edit2, X, Check, Loader2, Banknote } from 'lucide-react';
 import { Expense, PaymentMethod, WalletConfig } from '../types';
 import { format, isFuture } from 'date-fns';
-import it from 'date-fns/locale/it';
+import { it } from 'date-fns/locale/it';
 
 interface RicaricheViewProps {
   onRefill: (wallet: WalletConfig) => void;
@@ -146,20 +146,29 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
         </div>
         <div className="space-y-3">
           {refillExpenses.length > 0 ? (
-            refillExpenses.map((expense) => (
-              <div key={expense.id} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-700/50 hover:bg-emerald-50 dark:hover:bg-gray-700 transition-colors">
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center text-emerald-500 shadow-sm"><Plus size={18} /></div>
-                   <div>
-                     <p className="font-bold text-gray-800 dark:text-white text-sm">{expense.description}</p>
-                     <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-tight">
-                       {format(new Date(expense.date), 'dd MMMM yyyy', { locale: it })} • {expense.paymentMethod}
-                     </p>
-                   </div>
+            refillExpenses.map((expense) => {
+              const [y, m, d] = expense.date.split('-').map(Number);
+              const expenseDate = new Date(y, m - 1, d);
+              const isDateInFuture = isFuture(expenseDate);
+              
+              return (
+                <div key={expense.id} className={`flex items-center justify-between p-4 rounded-2xl transition-colors ${isDateInFuture ? 'bg-red-50/40 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30' : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-emerald-50 dark:hover:bg-gray-700'}`}>
+                  <div className="flex items-center gap-4">
+                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${isDateInFuture ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-white dark:bg-gray-800 text-emerald-500'}`}><Plus size={18} /></div>
+                     <div>
+                       <p className={`font-bold text-sm ${isDateInFuture ? 'text-red-700 dark:text-red-300' : 'text-gray-800 dark:text-white'}`}>{expense.description}</p>
+                       <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium uppercase tracking-tight">
+                         {format(expenseDate, 'dd MMMM yyyy', { locale: it })} • {expense.paymentMethod}
+                       </p>
+                     </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className={`font-bold ${isDateInFuture ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>+{currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                    {isDateInFuture && <span className="text-[8px] font-bold text-red-500 uppercase">In programma</span>}
+                  </div>
                 </div>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">+{currency}{expense.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="text-center py-10"><p className="text-gray-400 dark:text-gray-500 text-sm">Nessuna ricarica registrata.</p></div>
           )}

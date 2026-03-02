@@ -83,9 +83,72 @@ const App: React.FC = () => {
   const extraExpenses = useMemo(() => allExpenses.filter(e => (e.profile || 'personal') === 'personal' && e.isExtra), [allExpenses]);
   const currentBudget = userSettings.monthlyBudget;
 
+  // Carica le impostazioni dal Cloud quando la sessione è pronta
+  useEffect(() => {
+    const loadCloudSettings = async () => {
+      if (session?.user?.id) {
+        try {
+          console.log("Carico impostazioni dal cloud (profiles)...");
+          const profile = await db.getProfile(session.user.id);
+          if (profile?.settings) {
+            console.log("Impostazioni cloud trovate:", profile.settings);
+            setUserSettings(prev => ({ ...prev, ...profile.settings }));
+          }
+        } catch (err) {
+          console.error("Errore caricamento settings dal profilo:", err);
+        }
+      }
+    };
+    loadCloudSettings();
+  }, [session?.user?.id]);
+
+  // Sincronizzazione Realtime delle Impostazioni
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    // Ascolta i cambiamenti delle impostazioni dagli altri dispositivi tramite la tabella profiles
+    const settingsChannel = supabase.channel(`settings_sync_${session.user.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'profiles',
+        filter: `id=eq.${session.user.id}` 
+      }, (payload) => {
+        if (payload.new.settings) {
+          console.log("Rilevato cambio impostazioni (realtime profiles)!", payload.new.settings);
+          setUserSettings(prev => {
+            // Evita aggiornamenti se i dati sono identici (prevenzione loop)
+            const isSame = JSON.stringify(prev) === JSON.stringify(payload.new.settings);
+            if (isSame) return prev;
+            
+            setSuccessToast("Impostazioni sincronizzate!");
+            setTimeout(() => setSuccessToast(null), 2000);
+            return { ...prev, ...payload.new.settings };
+          });
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(settingsChannel); };
+  }, [session?.user?.id]);
+
+  // Salva le impostazioni nel Cloud quando cambiano (con debounce)
   useEffect(() => {
     localStorage.setItem('mintflow_user_settings', JSON.stringify(userSettings));
-  }, [userSettings]);
+    
+    if (session?.user?.id) {
+      const timeoutId = setTimeout(async () => {
+        console.log("Salvataggio impostazioni in cloud (profiles)...");
+        try {
+          await db.updateProfileSettings(session.user.id, userSettings);
+        } catch (err) {
+          console.error("Errore salvataggio settings nel profilo:", err);
+        }
+      }, 3000); // 3 secondi di debounce per evitare troppe scritture
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [userSettings, session]);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings' | 'subscriptions' | 'extra'>('dashboard');
   const [showForm, setShowForm] = useState(false);
@@ -122,14 +185,23 @@ const App: React.FC = () => {
     };
 
     const initSecurity = async () => {
+      // Timeout di sicurezza per evitare caricamento infinito
+      const timeout = setTimeout(() => {
+        if (isInitialLoading) {
+          console.warn("[Security] Inizializzazione in timeout, forzo avvio...");
+          setIsInitialLoading(false);
+          setIsBanned(false);
+        }
+      }, 8000);
+
       const { data: { session: currentSession } } = await supabase.auth.getSession();
+      console.log("[Security] Sessione iniziale recuperata:", currentSession ? "Presente" : "Null");
       setSession(currentSession);
       
       if (currentSession?.user) {
-        // 1. PRIMA controlla lo stato
+        // ...
         const banned = await checkStatus(currentSession.user.id);
         
-        // 2. SOLO se NON è bannato, procedi con l'aggiornamento (upsert)
         if (!banned) {
           const metadata = currentSession.user.user_metadata;
           const displayName = metadata.full_name || metadata.display_name || metadata.name || currentSession.user.email?.split('@')[0] || 'Utente';
@@ -137,7 +209,6 @@ const App: React.FC = () => {
           await db.upsertProfile(currentSession.user.id, currentSession.user.email || '', displayName);
         }
 
-        // 3. REALTIME: Ascolta i cambiamenti di stato
         if (channel) supabase.removeChannel(channel);
         channel = supabase
           .channel(`security-${currentSession.user.id}`)
@@ -154,12 +225,14 @@ const App: React.FC = () => {
       } else {
         setIsBanned(false);
       }
+      clearTimeout(timeout);
       setIsInitialLoading(false);
     };
 
     initSecurity();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log("[Auth] Evento AuthChange:", event, currentSession ? "Sessione presente" : "Sessione nulla");
       setSession(currentSession);
       if (currentSession?.user) {
         // Ad ogni cambio sessione, riverifica
@@ -181,46 +254,423 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const fetchExpenses = useCallback(async () => {
+  const fetchExpenses = useCallback(async (silent = false) => {
     if (!session?.user?.id || isBanned) return;
     try {
-      setIsLoading(true);
-      const data = await db.getExpenses(session.user.id);
+      if (!silent) setIsLoading(true);
+      
+      // 1. Prova a caricare dal server con timeout (aumentato a 60s)
+      const fetchPromise = db.getExpenses(session.user.id);
+      const timeoutPromise = new Promise<Expense[]>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout caricamento dati (60s)")), 60000)
+      );
+      
+      let data = await Promise.race([fetchPromise, timeoutPromise]);
+      
+      // Sincronizza spese locali non salvate (offline sync)
+      const cachedDataStr = localStorage.getItem('mintflow_cache_v2');
+      if (cachedDataStr) {
+        try {
+          const cachedData: Expense[] = JSON.parse(cachedDataStr);
+          const localUnsynced = cachedData.filter(e => e._isLocal);
+          
+          if (localUnsynced.length > 0) {
+            let syncCount = 0;
+            for (const exp of localUnsynced) {
+              try {
+                const { id, _isLocal, ...expenseData } = exp;
+                if (id.startsWith('temp-')) {
+                  // Nuova spesa
+                  await db.addExpense(expenseData, session.user.id);
+                } else {
+                  // Modifica spesa esistente
+                  await db.updateExpense(id, expenseData);
+                }
+                syncCount++;
+              } catch (e) {
+                console.error("Errore sync spesa locale:", e);
+              }
+            }
+            if (syncCount > 0) {
+              // Ricarica dal server se abbiamo sincronizzato qualcosa
+              data = await db.getExpenses(session.user.id);
+              setSuccessToast(`Sincronizzate ${syncCount} spese offline!`);
+              setTimeout(() => setSuccessToast(null), 3000);
+            }
+          }
+        } catch (e) {
+          console.error("Errore lettura cache per sync:", e);
+        }
+      }
+
+      // 2. Salva nella cache locale aggiornata
+      localStorage.setItem('mintflow_cache_v2', JSON.stringify(data));
+      
       setAllExpenses(data);
-    } catch (err) {
+      
+      // Controlla se ci sono dati locali da migrare (vecchia versione)
+      const localData = localStorage.getItem('mintflow_expenses');
+      if (localData) {
+        try {
+          const expensesToMigrate: Expense[] = JSON.parse(localData);
+          if (expensesToMigrate.length > 0) {
+            setIsSyncing(true);
+            setSuccessToast(`Recupero di ${expensesToMigrate.length} vecchie spese in corso...`);
+            
+            // Carica le spese una ad una
+            for (const exp of expensesToMigrate.reverse()) {
+              const { id, ...expenseData } = exp;
+              await db.addExpense({ ...expenseData, profile: 'personal' }, session.user.id);
+            }
+            
+            // Ricarica le spese aggiornate dal server
+            const updatedData = await db.getExpenses(session.user.id);
+            setAllExpenses(updatedData);
+            localStorage.setItem('mintflow_cache_v2', JSON.stringify(updatedData));
+            
+            setSuccessToast("Dati recuperati e salvati in cloud con successo!");
+            setTimeout(() => setSuccessToast(null), 4000);
+          }
+          // Rimuovi i dati locali per non migrarli di nuovo
+          localStorage.removeItem('mintflow_expenses');
+        } catch (migrationErr) {
+          console.error("Errore durante la migrazione:", migrationErr);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    } catch (err: any) {
       console.error("Errore caricamento:", err);
+      setSuccessToast("Errore caricamento dati!");
+      setTimeout(() => setSuccessToast(null), 3000);
+      
+      // FALLBACK: Carica dalla cache locale se il server fallisce
+      const cachedData = localStorage.getItem('mintflow_cache_v2');
+      if (cachedData) {
+        try {
+          const parsedCache = JSON.parse(cachedData);
+          setAllExpenses(parsedCache);
+          setSuccessToast("Modalità Offline: Dati dalla cache");
+          if (!silent) alert("Impossibile connettersi al server. Mostro i dati salvati localmente.");
+        } catch (e) {
+          console.error("Cache corrotta");
+        }
+      } else {
+        if (!silent) alert(`Impossibile caricare le spese: ${err.message || "Errore di connessione"}`);
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [session, isBanned]);
 
-  useEffect(() => { if (session?.user?.id) fetchExpenses(); }, [session, fetchExpenses]);
+  useEffect(() => { 
+    if (session?.user?.id) {
+      // Carica subito dalla cache per velocità, poi aggiorna dal server
+      const cachedData = localStorage.getItem('mintflow_cache_v2');
+      if (cachedData) {
+        try {
+          setAllExpenses(JSON.parse(cachedData));
+        } catch (e) {}
+      }
+
+      fetchExpenses(); 
+      
+      // Sottoscrizione realtime per mantenere sincronizzati i dispositivi
+      const expensesChannel = supabase
+        .channel(`public:expenses:user_id=eq.${session.user.id}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'expenses',
+          filter: `user_id=eq.${session.user.id}`
+        }, () => {
+          console.log("Cambiamento rilevato nel database, aggiorno le spese...");
+          fetchExpenses(true);
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(expensesChannel);
+      };
+    }
+  }, [session, fetchExpenses]);
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleForcedLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
+    console.log("[Logout] Logout forzato avviato...");
+    setIsLoggingOut(true);
+    
+    // 1. Pulizia immediata della memoria locale
+    try {
+      console.log("[Logout] Inizio pulizia storage...");
+      localStorage.clear();
+      sessionStorage.clear();
+      console.log("[Logout] Storage locale pulito con successo.");
+    } catch (e: any) {
+      console.error("[Logout] Errore durante la pulizia dello storage:", e.message);
+    }
+
+    try {
+      // 2. Tentativo di logout tecnico con timeout
+      console.log("[Logout] Chiamata a supabase.auth.signOut()...");
+      const signOutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout signOut")), 3000)
+      );
+      
+      const result = await Promise.race([signOutPromise, timeoutPromise]);
+      console.log("[Logout] Risultato signOut:", result);
+      console.log("[Logout] Logout tecnico completato.");
+    } catch (err: any) {
+      console.warn("[Logout] Logout tecnico fallito o in timeout, procedo comunque col reload:", err.message);
+    }
+    
+    // 3. Reindirizzamento forzato alla home con cache busting
+    const targetUrl = window.location.origin + "?logout=" + Date.now();
+    console.log("[Logout] Reindirizzamento finale a:", targetUrl);
+    
+    // Piccola pausa per permettere ai log di essere inviati e all'utente di vedere l'overlay
+    setTimeout(() => {
+      window.location.href = targetUrl;
+    }, 500);
+  };
+
+  const handleUpdateWallets = async (newWallets: WalletConfig[]) => {
+    const newSettings = { ...userSettings, wallets: newWallets };
+    setUserSettings(newSettings);
+    
+    // Immediate sync to cloud
+    if (session?.user?.id) {
+      try {
+        await db.updateProfileSettings(session.user.id, newSettings);
+        setSuccessToast("Portafogli sincronizzati!");
+        setTimeout(() => setSuccessToast(null), 2000);
+      } catch (e) {
+        console.error("Error syncing wallets:", e);
+      }
+    }
   };
 
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id'>) => {
+    if (!session?.user?.id) {
+      setSuccessToast("Errore: Non sei connesso!");
+      setTimeout(() => setSuccessToast(null), 3000);
+      return;
+    }
+
+    // 1. UI Optimistic Update
+    const tempId = 'temp-' + Date.now();
+    const optimisticExpense: Expense = {
+      id: prefill?.id || tempId,
+      ...expenseData,
+      profile: 'personal' as ProfileType,
+      _isLocal: true // Segna come locale finché non confermato
+    };
+
+    // Aggiorna subito la UI e la CACHE
+    setAllExpenses(prev => {
+      const newState = prefill?.id 
+        ? prev.map(e => e.id === optimisticExpense.id ? optimisticExpense : e) 
+        : [optimisticExpense, ...prev];
+      localStorage.setItem('mintflow_cache_v2', JSON.stringify(newState));
+      return newState;
+    });
+    
+    setShowForm(false);
+    setPrefill(null);
+    setSuccessToast("Salvataggio in corso...");
+
+    // 2. Background Sync con Timeout
+    try {
+      const dataToSave = { ...expenseData, profile: 'personal' as ProfileType };
+      
+      const savePromise = prefill?.id 
+        ? db.updateExpense(prefill.id, dataToSave)
+        : db.addExpense(dataToSave, session.user.id);
+
+      // Timeout di 60 secondi per evitare blocchi (aumentato per connessioni lente)
+      const timeoutPromise = new Promise<Expense>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout: Il server non risponde in tempo (60s)")), 60000)
+      );
+
+      const saved = await Promise.race([savePromise, timeoutPromise]);
+      
+      // Sostituisci l'ID temporaneo con quello reale se era un nuovo inserimento
+      setAllExpenses(prev => {
+        const newState = prev.map(e => e.id === (prefill?.id || tempId) ? { ...saved, _isLocal: false } : e);
+        localStorage.setItem('mintflow_cache_v2', JSON.stringify(newState));
+        return newState;
+      });
+      
+      setSuccessToast("Salvato!");
+      setTimeout(() => setSuccessToast(null), 2000);
+    } catch (err: any) { 
+      // Rollback in caso di errore
+      console.error("Errore salvataggio:", err);
+      setSuccessToast("Errore salvataggio!");
+      setTimeout(() => setSuccessToast(null), 3000);
+      
+      // Mostra un messaggio più dettagliato
+      const errorMsg = err.message || "Errore sconosciuto";
+      alert(`Impossibile salvare la spesa sul server: ${errorMsg}. La spesa rimarrà salvata localmente.`);
+      
+      // NON RIMUOVERE LA SPESA, lasciala come locale (_isLocal=true)
+      // Così l'utente non perde i dati.
+      // In futuro potremmo aggiungere un meccanismo di retry.
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
     try {
       setIsSyncing(true);
-      const dataToSave = { ...expenseData, profile: 'personal' as ProfileType };
-      let saved: Expense;
-      if (prefill?.id) saved = await db.updateExpense(prefill.id, dataToSave);
-      else saved = await db.addExpense(dataToSave, session.user.id);
-      setAllExpenses(prev => prefill?.id ? prev.map(e => e.id === saved.id ? saved : e) : [saved, ...prev]);
-      setShowForm(false);
-      setPrefill(null);
-      setSuccessToast("Operazione completata!");
+      await db.deleteExpense(id);
+      setAllExpenses(prev => prev.filter(e => e.id !== id));
+      setSuccessToast("Spesa eliminata!");
       setTimeout(() => setSuccessToast(null), 3000);
-    } catch (err: any) { alert(`Errore: ${err.message}`); }
-    finally { setIsSyncing(false); }
+    } catch (err: any) {
+      alert(`Errore durante l'eliminazione: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
   };
+
+  const handleSyncSubscriptions = async () => {
+    if (!session?.user?.id || allExpenses.length === 0) return;
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-indexed
+    const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+    // 1. Trova TUTTE le spese che sono segnate come abbonamento (indipendentemente dalla categoria)
+    //    Questo è fondamentale per trovare la catena di abbonamenti attiva.
+    const allSubs = allExpenses.filter(e => e.isSubscription);
+    
+    // 2. Trova gli abbonamenti che sono già presenti nel mese corrente
+    const currentMonthSubs = allSubs.filter(e => {
+      const [y, m] = e.date.split('-').map(Number);
+      return `${y}-${String(m).padStart(2, '0')}` === currentMonthStr;
+    });
+
+    // 3. Trova gli abbonamenti dei mesi passati che NON hanno ancora un corrispettivo nel mese corrente
+    const subsToDuplicate = allSubs.filter(oldSub => {
+      const [y, m] = oldSub.date.split('-').map(Number);
+      const expenseMonthStr = `${y}-${String(m).padStart(2, '0')}`;
+      
+      // Se è già del mese corrente, ignoralo
+      if (expenseMonthStr === currentMonthStr) return false;
+      
+      // Controlla se esiste già un abbonamento con la stessa descrizione nel mese corrente
+      const alreadyExistsInCurrentMonth = currentMonthSubs.some(
+        newSub => newSub.description.toLowerCase().trim() === oldSub.description.toLowerCase().trim()
+      );
+      
+      return !alreadyExistsInCurrentMonth;
+    });
+
+    // 4. Filtra per mantenere solo l'istanza più recente di ogni abbonamento da duplicare
+    const uniqueSubsToDuplicate = Array.from(
+      new Map(subsToDuplicate.map(sub => [sub.description.toLowerCase().trim(), sub])).values()
+    );
+
+    if (uniqueSubsToDuplicate.length === 0) {
+      setSuccessToast("Tutti gli abbonamenti sono già aggiornati!");
+      setTimeout(() => setSuccessToast(null), 3000);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const operations = uniqueSubsToDuplicate.map(async (sub: Expense) => {
+        const [,, dStr] = sub.date.split('-');
+        const d = parseInt(dStr, 10);
+        const lastDayOfCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
+        const safeDay = Math.min(d, lastDayOfCurrentMonth);
+        const newDate = `${currentMonthStr}-${String(safeDay).padStart(2, '0')}`;
+        
+        const newExpenseData = {
+          description: sub.description,
+          amount: sub.amount,
+          category: sub.category,
+          paymentMethod: sub.paymentMethod,
+          date: newDate,
+          isSubscription: true, // Il nuovo è un abbonamento attivo
+          profile: sub.profile,
+          isExtra: sub.isExtra,
+          extraType: sub.extraType
+        };
+        
+        // Aggiungi la nuova spesa per il mese corrente
+        const newExpense = await db.addExpense(newExpenseData, session.user.id);
+
+        // Aggiorna la vecchia spesa: NON è più un abbonamento attivo, ma una semplice spesa storica
+        await db.updateExpense(sub.id, { isSubscription: false });
+
+        return { newExpense, oldId: sub.id };
+      });
+
+      const results = await Promise.all(operations);
+      
+      // Aggiorna lo stato locale: aggiungi i nuovi e aggiorna i vecchi
+      setAllExpenses(prev => {
+        let updated = [...prev];
+        
+        results.forEach(({ newExpense, oldId }) => {
+          // Aggiungi nuovo
+          updated = [newExpense, ...updated];
+          
+          // Aggiorna vecchio (isSubscription: false)
+          const oldIndex = updated.findIndex(e => e.id === oldId);
+          if (oldIndex !== -1) {
+            updated[oldIndex] = { ...updated[oldIndex], isSubscription: false };
+          }
+        });
+        
+        return updated;
+      });
+
+      setSuccessToast(`${results.length} abbonamenti rinnovati per il mese corrente!`);
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (err: any) {
+      alert(`Errore durante l'aggiornamento: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleClearData = () => {
+    if (window.confirm("Vuoi resettare tutte le impostazioni locali? I dati sul server rimarranno intatti.")) {
+      localStorage.removeItem('mintflow_user_settings');
+      window.location.reload();
+    }
+  };
+
+  if (isLoggingOut) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center justify-center p-6">
+        <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h2 className="text-2xl font-black mb-2">Disconnessione in corso...</h2>
+        <p className="text-gray-500 dark:text-gray-400">Stiamo chiudendo la tua sessione in modo sicuro.</p>
+      </div>
+    );
+  }
 
   if (isInitialLoading || isBanned === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-mint-50 dark:bg-gray-900">
-        <Loader2 className="animate-spin text-emerald-500" size={48} />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-mint-50 dark:bg-gray-900 p-6">
+        <Loader2 className="animate-spin text-emerald-500 mb-6" size={48} />
+        <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse text-center">Inizializzazione MintFlow...</p>
+        
+        {/* Pulsante di emergenza se il caricamento dura troppo */}
+        <div className="mt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="text-[10px] font-bold text-emerald-600/50 uppercase tracking-widest hover:text-emerald-600 transition-colors"
+          >
+            Problemi di caricamento? Clicca qui per ricaricare
+          </button>
+        </div>
       </div>
     );
   }
@@ -259,24 +709,30 @@ const App: React.FC = () => {
   }
 
   if (!session) return <Auth onSuccess={() => setIsBanned(false)} />;
-  if (session.user.email === 'admin@mintflow.com') return <AdminDashboard onLogout={() => setSession(null)} />;
+  if (session.user.email === 'admin@mintflow.com') return <AdminDashboard onLogout={handleForcedLogout} />;
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} lang={userSettings.language}>
+    <Layout 
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab} 
+      lang={userSettings.language}
+      currentProfile={userSettings.currentProfile}
+      onRefresh={() => fetchExpenses(false)}
+    >
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24 relative">
         {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">{successToast}</div>}
         {activeTab === 'dashboard' && <Dashboard expenses={expenses} budget={currentBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} userSettings={userSettings} onUpdateSettings={setUserSettings} />}
         {activeTab === 'list' && (
           <div className="space-y-6">
             <button onClick={() => { setPrefill(null); setShowForm(true); }} className="w-full bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg transition-transform active:scale-95"><Plus size={20} /> Aggiungi Spesa</button>
-            <ExpenseList expenses={expenses} onDelete={id => setAllExpenses(prev => prev.filter(e => e.id !== id))} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
+            <ExpenseList expenses={expenses} onDelete={handleDeleteExpense} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
           </div>
         )}
-        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={w => setUserSettings(prev => ({ ...prev, wallets: w }))} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
+        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={handleUpdateWallets} expenses={expenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
         {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={() => {}} expenses={expenses} email={session.user.email} />}
-        {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onDelete={id => setAllExpenses(prev => prev.filter(e => e.id !== id))} currency={userSettings.currency} />}
-        {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={id => setAllExpenses(prev => prev.filter(e => e.id !== id))} currency={userSettings.currency} />}
+        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={handleClearData} expenses={expenses} email={session.user.email} userId={session.user.id} onLogout={handleForcedLogout} />}
+        {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onEdit={ex => { setPrefill(ex); setShowForm(true); }} onDelete={handleDeleteExpense} currency={userSettings.currency} onSyncAll={handleSyncSubscriptions} />}
+        {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={handleDeleteExpense} currency={userSettings.currency} />}
         
         {showForm && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">

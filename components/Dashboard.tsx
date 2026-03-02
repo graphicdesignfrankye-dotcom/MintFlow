@@ -3,10 +3,10 @@ import { Expense, PaymentMethod, WalletConfig, CategoryConfig, UserSettings } fr
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
-import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown, SlidersHorizontal, Edit2, X, Check, Loader2, ChevronLeft } from 'lucide-react';
+import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown, SlidersHorizontal, Edit2, X, Check, Loader2, ChevronLeft, AlertTriangle } from 'lucide-react';
 import { format, isSameMonth, isFuture } from 'date-fns';
-import it from 'date-fns/locale/it';
-import enUS from 'date-fns/locale/en-US';
+import { it } from 'date-fns/locale/it';
+import { enUS } from 'date-fns/locale/en-US';
 import { translations } from '../utils/i18n';
 
 // Helper functions to replace date-fns missing exports
@@ -82,6 +82,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isEditingTotal, setIsEditingTotal] = useState(false);
   const [tempTotal, setTempTotal] = useState('');
 
+  const [isEditingBudget, setIsEditingBudget] = useState(false);
+  const [tempBudget, setTempBudget] = useState('');
+
   const parseDate = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d);
@@ -104,14 +107,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
          // Escludi date future
          if (isFuture(parseDate(e.date))) return false;
 
-         // Includi Bancomat, Contanti e Ricariche
-         const isStandard = e.paymentMethod === PaymentMethod.Bancomat || e.paymentMethod === PaymentMethod.Contanti;
+         // Escludi ricariche e aggiustamenti tecnici
          const isRefill = e.description.toLowerCase().includes('ricarica');
-         
-         // Escludi gli aggiustamenti tecnici
          const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
 
-         return (isStandard || isRefill) && !isAdjustment;
+         return !isRefill && !isAdjustment;
+      })
+      .reduce((sum, e) => sum + e.amount, 0);
+  }, [currentMonthExpenses]);
+
+  const totalRicariche = useMemo(() => {
+    return currentMonthExpenses
+      .filter(e => {
+         if (isFuture(parseDate(e.date))) return false;
+         return e.description.toLowerCase().includes('ricarica');
       })
       .reduce((sum, e) => sum + e.amount, 0);
   }, [currentMonthExpenses]);
@@ -134,7 +143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const lastMonthExpenses = expenses.filter(e => isSameMonth(parseDate(e.date), lastMonthDate));
     return lastMonthExpenses
       .filter(e => 
-        (e.paymentMethod === PaymentMethod.Bancomat || e.paymentMethod === PaymentMethod.Contanti || e.description.toLowerCase().includes('ricarica')) && 
+        !e.description.toLowerCase().includes('ricarica') && 
         !e.description.toLowerCase().includes('aggiustamento') &&
         !e.description.toLowerCase().includes('modifica') &&
         !isFuture(parseDate(e.date))
@@ -143,7 +152,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [expenses, currentMonthDate]);
 
   const diff = totalLastMonth > 0 ? ((totalCurrentMonth - totalLastMonth) / totalLastMonth) * 100 : 0;
-  const budgetProgress = Math.min((totalCurrentMonth / budget) * 100, 100);
 
   // LOGICA SALDI WALLET - STORICO COMPLETO (CUMULATIVO)
   const balances = useMemo(() => {
@@ -209,11 +217,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           if (isFuture(d)) return false;
 
           // Stessa logica di "Calculated Total"
-          const isStandard = e.paymentMethod === PaymentMethod.Bancomat || e.paymentMethod === PaymentMethod.Contanti;
           const isRefill = e.description.toLowerCase().includes('ricarica');
           const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
 
-          return (isStandard || isRefill) && !isAdjustment;
+          return !isRefill && !isAdjustment;
       }).reduce((sum, e) => sum + e.amount, 0);
 
       // 2. Controllo se esiste un offset manuale per QUESTO mese specifico nelle impostazioni
@@ -264,12 +271,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsEditingTotal(false);
   };
 
+  const handleSaveBudget = () => {
+    if (!userSettings || !onUpdateSettings) return;
+    
+    const target = parseFloat(tempBudget.replace(',', '.'));
+    if (isNaN(target) || target < 0) {
+      alert("Inserisci un importo valido");
+      return;
+    }
+
+    onUpdateSettings({
+      ...userSettings,
+      monthlyBudget: target
+    });
+    
+    setIsEditingBudget(false);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="mb-2">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t.hello}, {userName}! 👋</h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">{t.subtitle}</p>
+      <div className="mb-2 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t.hello}, {userName}! 👋</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{t.subtitle}</p>
+        </div>
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 flex items-center gap-2 shrink-0">
+          <Calendar size={16} className="text-emerald-600 dark:text-emerald-400" />
+          <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300 capitalize">
+            {format(new Date(), 'MMMM yyyy', { locale: it })}
+          </span>
+        </div>
       </div>
+
+      {/* Alert Budget */}
+      {budget > 0 && totalCurrentMonth >= budget * 0.8 && (
+        <div className={`${totalCurrentMonth >= budget ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'} border p-4 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-2`}>
+          <div className={`${totalCurrentMonth >= budget ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' : 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400'} p-2 rounded-xl shrink-0`}>
+            <AlertTriangle size={20} />
+          </div>
+          <div>
+            <h3 className={`${totalCurrentMonth >= budget ? 'text-red-800 dark:text-red-300' : 'text-orange-800 dark:text-orange-300'} font-bold text-sm`}>
+              {totalCurrentMonth >= budget ? 'Budget Superato!' : 'Attenzione al Budget!'}
+            </h3>
+            <p className={`${totalCurrentMonth >= budget ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'} text-xs mt-1 font-medium`}>
+              {totalCurrentMonth >= budget 
+                ? `Hai superato il tuo budget mensile. Hai speso ${formatValue(totalCurrentMonth)} su ${formatValue(budget)}.`
+                : `Hai superato l'80% del tuo budget mensile. Hai speso ${formatValue(totalCurrentMonth)} su ${formatValue(budget)}.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* --- CARTE PRINCIPALI --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -287,23 +338,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <Edit2 size={16} className="text-white" />
                 </button>
               </div>
-              <p className="text-emerald-100 text-[10px] mt-1 font-medium">(Uscite Bancomat, Contanti & Ricariche)</p>
+              <p className="text-emerald-100 text-[10px] mt-1 font-medium">(Tutte le spese effettuate)</p>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm shrink-0"><CreditCard size={24} /></div>
           </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-medium text-emerald-50">
-              <span>{t.target}: {currency}{budget.toLocaleString('it-IT')}</span>
-              <span>{Math.round(budgetProgress)}%</span>
-            </div>
-            <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden">
-              <div className="h-full bg-white transition-all duration-1000" style={{ width: `${budgetProgress}%` }}></div>
-            </div>
+          <div className="mt-4 flex items-center gap-2 text-emerald-50 text-xs font-medium">
+             <div className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></div>
+             <span>Aggiornato in tempo reale</span>
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex flex-col gap-1 shadow-sm relative group">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-xl"><Target size={16} /></div>
+                <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-widest">Budget</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setTempBudget(budget.toString());
+                  setIsEditingBudget(true);
+                }}
+                className="p-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors opacity-0 group-hover:opacity-100"
+              >
+                <Edit2 size={12} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="mt-1">
+              <p className="font-black text-xl dark:text-white">{formatValue(budget - totalRicariche)}</p>
+              <p className="text-[10px] text-gray-400 font-medium mt-0.5">Budget iniziale: {formatValue(budget)}</p>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
             <div className={`p-3 rounded-2xl ${diff <= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
               {diff <= 0 ? <TrendingDown size={20} /> : <TrendingUp size={20} />}
             </div>
@@ -312,14 +380,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <p className={`font-black text-lg ${diff <= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                 {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
               </p>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 flex items-center gap-4 shadow-sm">
-            <div className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl"><Calendar size={20} /></div>
-            <div>
-              <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-widest">{t.month}</p>
-              <p className="font-black text-lg dark:text-white capitalize">{format(currentMonthDate, "MMMM", { locale: dateLocale })}</p>
             </div>
           </div>
         </div>
@@ -439,6 +499,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* --- MODALE EDIT BUDGET --- */}
+      {isEditingBudget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold dark:text-white">Modifica Budget Iniziale</h3>
+              <button onClick={() => setIsEditingBudget(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nuovo Budget</label>
+              <input 
+                autoFocus
+                type="number" 
+                inputMode="decimal"
+                value={tempBudget} 
+                onChange={(e) => setTempBudget(e.target.value)} 
+                className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-black text-2xl" 
+              />
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Questo è il budget di partenza del mese.</p>
+            </div>
+
+            <button 
+              onClick={handleSaveBudget}
+              className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-emerald-600 transition-colors"
+            >
+              <Check size={20} /> Salva Modifica
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* --- MODALE EDIT TOTALE --- */}
       {isEditingTotal && (
