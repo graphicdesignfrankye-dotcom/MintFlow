@@ -589,12 +589,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 try {
                   const isConnected = await db.checkConnection();
                   if (isConnected) {
-                    alert("✅ Connessione al database attiva e funzionante!");
+                    showFeedback("Connessione DB OK!");
                   } else {
-                    alert("❌ Errore di connessione al database. Controlla la tua rete.");
+                    showFeedback("Errore Connessione DB");
                   }
                 } catch (e) {
-                  alert("❌ Errore durante il test di connessione.");
+                  showFeedback("Errore Test Connessione");
                 }
               }} 
               className="w-full flex items-center justify-center gap-2 text-emerald-500 text-[10px] font-bold uppercase tracking-wider hover:text-emerald-600 transition-all pt-2"

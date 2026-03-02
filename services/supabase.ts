@@ -2,10 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { Expense, PaymentMethod, ProfileType, AppNotification } from '../types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://jpcweqcqysxgzycftzyv.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
+const SUPABASE_URL = 'https://jpcweqcqysxgzycftzyv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storageKey: 'mintflow-user-auth-token',
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 // Client Admin opzionale (usato solo se la chiave è presente e valida)
 // Aggiunto storageKey dedicato per evitare conflitti con il client principale
@@ -166,7 +173,12 @@ export const db = {
   },
 
   async getExpenses(userId: string): Promise<Expense[]> {
-    const { data, error } = await supabase.from('expenses').select('*').eq('user_id', userId).order('date', { ascending: false });
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(2000);
     if (error) throw error;
     return (data || []).map((e: any) => {
       const unpacked = unpackDescription(e.description);

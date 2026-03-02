@@ -282,7 +282,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     onUpdateSettings({
       ...userSettings,
-      monthlyBudget: target
+      monthlyBudget: target,
+      lastBudgetUpdate: new Date().toISOString()
     });
     
     setIsEditingBudget(false);
