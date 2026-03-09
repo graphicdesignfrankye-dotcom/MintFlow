@@ -753,10 +753,10 @@ const App: React.FC = () => {
         {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={handleDeleteExpense} currency={userSettings.currency} wallets={userSettings.wallets} currentProfile={userSettings.currentProfile} />}
         
         {showForm && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-md p-8 shadow-2xl relative animate-in zoom-in-95 duration-200">
-              <button onClick={() => setShowForm(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><X size={24} /></button>
-              <h2 className="text-2xl font-bold mb-6 dark:text-white">{prefill?.id ? 'Modifica Spesa' : 'Nuova Spesa'}</h2>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 relative animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto no-scrollbar">
+              <button onClick={() => setShowForm(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><X size={24} /></button>
+              <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 dark:text-white">{prefill?.id ? 'Modifica Spesa' : 'Nuova Spesa'}</h2>
               <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
             </div>
           </div>

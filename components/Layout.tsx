@@ -234,7 +234,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       <main>{children}</main>
 
       {/* Bottom Nav Scorrevole per Mobile (Mostra tutte le sezioni) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-4 flex items-center overflow-x-auto no-scrollbar gap-8 pb-4 transition-colors z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-emerald-100 dark:border-gray-800 h-20 px-2 flex items-center overflow-x-auto no-scrollbar gap-4 pb-4 transition-colors z-50">
         <MobileNavButton 
           active={activeTab === 'dashboard'} 
           onClick={() => setActiveTab('dashboard')}
@@ -257,13 +257,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           active={activeTab === 'subscriptions'} 
           onClick={() => setActiveTab('subscriptions')}
           icon={<Repeat />}
-          label={t.subscriptions.substring(0, 5) + '.'}
+          label="Subs"
         />
         <MobileNavButton 
           active={activeTab === 'ricariche'} 
           onClick={() => setActiveTab('ricariche')}
           icon={<Zap />}
-          label={t.wallets}
+          label="Wallets"
         />
         <MobileNavButton 
           active={activeTab === 'ai'} 
@@ -275,7 +275,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           active={activeTab === 'settings'} 
           onClick={() => setActiveTab('settings')}
           icon={<Settings />}
-          label={t.settings.substring(0, 4) + '.'}
+          label="Set."
         />
       </nav>
     </div>
@@ -299,11 +299,11 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
 const MobileNavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center gap-1 transition-all min-w-[60px] shrink-0 ${
+    className={`flex flex-col items-center gap-1 transition-all min-w-[50px] shrink-0 ${
       active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'
     }`}
   >
-    {React.cloneElement(icon, { size: 22, strokeWidth: active ? 2.5 : 2 })}
-    <span className="text-[10px] font-bold uppercase tracking-tighter truncate">{label}</span>
+    {React.cloneElement(icon, { size: 20, strokeWidth: active ? 2.5 : 2 })}
+    <span className="text-[9px] font-bold uppercase tracking-tighter truncate">{label}</span>
   </button>
 );

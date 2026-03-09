@@ -57,7 +57,7 @@ export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete,
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Balance Card - Updated to match Dashboard style (Emerald) */}
-      <div className="bg-emerald-500 p-8 rounded-[2.5rem] text-white shadow-xl shadow-emerald-200/50 dark:shadow-none relative overflow-hidden">
+      <div className="bg-emerald-500 p-6 md:p-8 rounded-[2.5rem] text-white shadow-xl shadow-emerald-200/50 dark:shadow-none relative overflow-hidden">
         <div className="flex justify-between items-start z-10 relative">
           <div>
             <p className="text-emerald-50 text-xs font-bold uppercase tracking-widest mb-1">Saldo Extra</p>
@@ -127,7 +127,7 @@ export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete,
 
       {isAdding && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200 relative">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-6 md:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 animate-in zoom-in-95 duration-200 relative">
             <button onClick={() => setIsAdding(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"><X size={24} /></button>
             
             <h3 className={`text-xl font-bold mb-6 ${transactionType === 'given' ? 'text-red-500' : 'text-emerald-500'}`}>

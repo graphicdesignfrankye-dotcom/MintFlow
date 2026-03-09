@@ -128,55 +128,55 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   return (
     <div className="relative">
-      <form onSubmit={(e) => { e.preventDefault(); validateAndProcess(); }} className="space-y-5">
+      <form onSubmit={(e) => { e.preventDefault(); validateAndProcess(); }} className="space-y-3 sm:space-y-4">
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Descrizione</label>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Descrizione</label>
           <input 
             type="text" 
             value={description} 
             onChange={(e) => setDescription(e.target.value)} 
             placeholder="Cosa hai acquistato?" 
-            className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-white outline-none font-medium" 
+            className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-white outline-none font-medium text-sm" 
             required 
           />
           <SmartCategorizer description={description} onSuggest={setCategory} categories={categories} />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Importo</label>
+            <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Importo</label>
             <input 
               type="text" 
               inputMode="decimal" 
               value={amount} 
               onChange={(e) => setAmount(e.target.value)} 
               placeholder={`0.00 ${currency}`} 
-              className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-bold text-xl" 
+              className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-bold text-lg" 
               required 
             />
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Data</label>
+            <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Data</label>
             <input 
               type="date" 
               value={date} 
               onChange={(e) => setDate(e.target.value)} 
-              className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-white outline-none font-medium" 
+              className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-white outline-none font-medium text-sm" 
               required 
             />
           </div>
         </div>
 
-        <button type="button" onClick={() => setIsSubscription(!isSubscription)} className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isSubscription ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-gray-50 border-transparent text-gray-400'}`}>
-          <div className="flex items-center gap-2 font-bold text-sm"><Repeat size={18} /> Abbonamento Ricorrente</div>
-          <div className={`w-10 h-6 rounded-full relative transition-colors ${isSubscription ? 'bg-emerald-500' : 'bg-gray-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isSubscription ? 'left-5' : 'left-1'}`}></div></div>
+        <button type="button" onClick={() => setIsSubscription(!isSubscription)} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${isSubscription ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-gray-50 border-transparent text-gray-400'}`}>
+          <div className="flex items-center gap-2 font-bold text-xs"><Repeat size={16} /> Abbonamento Ricorrente</div>
+          <div className={`w-8 h-5 rounded-full relative transition-colors ${isSubscription ? 'bg-emerald-500' : 'bg-gray-300'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isSubscription ? 'left-4' : 'left-1'}`}></div></div>
         </button>
 
         <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Metodo di Pagamento</label>
-          <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+          <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Metodo di Pagamento</label>
+          <div className="grid grid-cols-2 gap-2 max-h-28 overflow-y-auto p-1 custom-scrollbar">
             {[PaymentMethod.Bancomat, ...wallets.map(w => w.method)].map((m) => (
-              <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex items-center gap-2 px-3 py-3 rounded-xl text-[10px] font-bold border-2 transition-all ${paymentMethod === m ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-emerald-50 dark:border-gray-700 text-gray-500'}`}>
+              <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[9px] font-bold border-2 transition-all ${paymentMethod === m ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-emerald-50 dark:border-gray-700 text-gray-500'}`}>
                 {getPaymentIcon(m)} <span className="truncate">{wallets.find(w => w.method === m)?.name || m}</span>
               </button>
             ))}
@@ -184,20 +184,20 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
         </div>
 
         <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Categoria</label>
-          <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+          <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Categoria</label>
+          <div className="grid grid-cols-2 gap-2 max-h-28 overflow-y-auto p-1 custom-scrollbar">
             {categories.map((cat) => (
-              <button key={cat.id} type="button" onClick={() => setCategory(cat.name)} className={`px-4 py-3 rounded-xl text-xs font-bold border-2 transition-all ${category === cat.name ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-emerald-50 dark:border-gray-700 text-gray-500'}`}>
+              <button key={cat.id} type="button" onClick={() => setCategory(cat.name)} className={`px-3 py-2.5 rounded-lg text-[10px] font-bold border-2 transition-all ${category === cat.name ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-emerald-50 dark:border-gray-700 text-gray-500'}`}>
                 {cat.name}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex gap-4 pt-4">
-          <button type="button" onClick={onCancel} className="flex-1 px-6 py-4 rounded-2xl border-2 border-gray-100 dark:border-gray-700 text-gray-400 font-bold hover:bg-gray-50 transition-colors">Annulla</button>
-          <button type="submit" disabled={isSubmitting} className="flex-1 px-6 py-4 rounded-2xl bg-emerald-500 text-white font-bold shadow-xl shadow-emerald-100 dark:shadow-none disabled:opacity-70 flex items-center justify-center gap-2 active:scale-95 transition-transform">
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />} Salva
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={onCancel} className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 text-gray-400 font-bold hover:bg-gray-50 transition-colors text-sm">Annulla</button>
+          <button type="submit" disabled={isSubmitting} className="flex-1 px-4 py-3 rounded-xl bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-70 flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm">
+            {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Salva
           </button>
         </div>
       </form>
@@ -205,7 +205,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
       {/* MODALE DI CONFERMA PERSONALIZZATO */}
       {showConfirmModal.show && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-emerald-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl text-center animate-in zoom-in-95 duration-300 border-4 border-emerald-500">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] text-center animate-in zoom-in-95 duration-300 border-4 border-emerald-500">
             <div className="bg-emerald-100 dark:bg-emerald-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
               {showConfirmModal.type === 'duplicate' ? <Copy size={32} /> : <AlertTriangle size={32} />}
             </div>

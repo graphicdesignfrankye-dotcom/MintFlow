@@ -221,7 +221,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
       {/* MODALE DI CONFERMA ELIMINAZIONE */}
       {itemToDelete && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-emerald-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl text-center animate-in zoom-in-95 duration-300 border-4 border-red-500">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] text-center animate-in zoom-in-95 duration-300 border-4 border-red-500">
             <div className="bg-red-100 dark:bg-red-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
               <Trash2 size={32} />
             </div>

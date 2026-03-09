@@ -18,9 +18,9 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-md z-[110] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-md p-6 md:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{title}</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white">{title}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
         </div>
         {children}
@@ -291,10 +291,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   
   if (view === 'wallets') return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+      <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
         <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
-        <h2 className="text-3xl font-bold dark:text-white mb-6">{t.manageWallets}</h2>
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
+        <h2 className="text-2xl md:text-3xl font-bold dark:text-white mb-6">{t.manageWallets}</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
           {settings.wallets.map(w => (
             <div key={w.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative">
               <div className="flex items-center gap-3 font-bold dark:text-white"><Wallet className="text-emerald-500" /> {w.name}</div>
@@ -337,10 +337,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   if (view === 'categories') return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+      <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
         <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
-        <h2 className="text-3xl font-bold dark:text-white mb-6">{t.manageCategories}</h2>
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
+        <h2 className="text-2xl md:text-3xl font-bold dark:text-white mb-6">{t.manageCategories}</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
           {settings.categories.map(c => (
             <div key={c.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl relative group min-h-[72px]">
               {editingId === c.id ? (
@@ -524,9 +524,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><FileDown className="text-emerald-500" size={20} /> {t.dataArchive}</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <button type="button" onClick={() => setView('history')} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><History size={20} /> <span className="text-xs md:text-sm">{t.history}</span></button>
-          <button type="button" onClick={onExport} className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all"><Download size={20} /> <span className="text-xs md:text-sm">{t.export}</span></button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          <button type="button" onClick={() => setView('history')} className="flex items-center justify-center gap-3 p-4 md:p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all border border-transparent hover:border-emerald-200"><History size={20} /> <span className="text-[11px] md:text-sm">{t.history}</span></button>
+          <button type="button" onClick={onExport} className="flex items-center justify-center gap-3 p-4 md:p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all border border-transparent hover:border-emerald-200"><Download size={20} /> <span className="text-[11px] md:text-sm">{t.export}</span></button>
           
           {/* Import CSV Button */}
           <button 
@@ -537,10 +537,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               }
             }} 
             disabled={isImporting}
-            className="flex items-center justify-center gap-3 p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all relative overflow-hidden"
+            className="flex items-center justify-center gap-3 p-4 md:p-5 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 transition-all relative overflow-hidden border border-transparent hover:border-emerald-200"
           >
             {isImporting ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />} 
-            <span className="text-xs md:text-sm">{t.import}</span>
+            <span className="text-[11px] md:text-sm">{t.import}</span>
             <input 
               type="file" 
               ref={fileInputRef}
@@ -576,7 +576,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-red-50 dark:border-red-900/10 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-[2.5rem] border border-red-50 dark:border-red-900/10 shadow-sm mb-20">
         <h3 className="text-lg font-bold text-red-500 mb-6 flex items-center gap-2"><ShieldCheck size={20} /> {t.security}</h3>
         <div className="space-y-4">
           <button 
@@ -590,13 +590,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 alert("Errore tecnico: funzione di logout non trovata.");
               }
             }} 
-            className="w-full flex items-center justify-center gap-3 p-5 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 shadow-lg shadow-red-100 transition-all active:scale-95"
+            className="w-full flex items-center justify-center gap-3 p-4 md:p-5 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 shadow-lg shadow-red-100 dark:shadow-none transition-all active:scale-95"
           >
             <LogOut size={20} /> {t.logout || 'Disconnetti'}
           </button>
           <div className="flex flex-col gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <button type="button" onClick={handleDeleteAccount} className="w-full py-3 text-red-400 text-xs font-bold hover:text-red-600 transition-all flex items-center justify-center gap-2"><Trash2 size={14} /> {t.deleteAccount}</button>
-            <button type="button" onClick={onClearData} className="w-full flex items-center justify-center gap-2 text-gray-400 text-[10px] font-bold uppercase tracking-wider hover:text-red-500 transition-all"><Trash2 size={10} /> {t.clearData}</button>
+            <button type="button" onClick={handleDeleteAccount} className="w-full py-3 text-red-400 text-[10px] md:text-xs font-bold hover:text-red-600 transition-all flex items-center justify-center gap-2"><Trash2 size={14} /> {t.deleteAccount}</button>
+            <button type="button" onClick={onClearData} className="w-full flex items-center justify-center gap-2 text-gray-400 text-[9px] md:text-[10px] font-bold uppercase tracking-wider hover:text-red-500 transition-all"><Trash2 size={10} /> {t.clearData}</button>
             <button 
               type="button" 
               onClick={async () => {
@@ -611,7 +611,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   showFeedback("Errore Test Connessione");
                 }
               }} 
-              className="w-full flex items-center justify-center gap-2 text-emerald-500 text-[10px] font-bold uppercase tracking-wider hover:text-emerald-600 transition-all pt-2"
+              className="w-full flex items-center justify-center gap-2 text-emerald-500 text-[9px] md:text-[10px] font-bold uppercase tracking-wider hover:text-emerald-600 transition-all pt-2"
             >
               <RefreshCw size={10} /> Test Connessione DB
             </button>

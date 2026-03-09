@@ -184,7 +184,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
 
       {editingWallet && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-6 md:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold dark:text-white">Modifica Saldo</h3>
               <button onClick={() => setEditingWallet(null)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
