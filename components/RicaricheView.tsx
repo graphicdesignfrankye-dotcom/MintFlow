@@ -60,6 +60,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
       
       return {
         ...w,
+        calculatedBalance,
         balance: Math.max(0, calculatedBalance + (w.balanceOffset || 0))
       };
     });
@@ -77,15 +78,15 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
     setEditingWallet(wallet);
   };
 
-  const handleBalanceUpdate = () => {
+  const handleBalanceUpdate = async () => {
     if (!editingWallet) return;
     const target = parseFloat(newBalance.replace(',', '.'));
-    if (isNaN(target) || target < 0) {
+    if (isNaN(target)) {
       alert("Inserisci un importo valido");
       return;
     }
 
-    const currentWalletState = balances.find(b => b.id === editingWallet.id);
+    const currentWalletState = (balances as any[]).find(b => b.id === editingWallet.id);
     if (!currentWalletState) return;
 
     // Logica Offset per saldo cumulativo
@@ -93,22 +94,26 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
     // Target = (RicaricheTotali - SpeseTotali) + NuovoOffset
     // NuovoOffset = Target - (RicaricheTotali - SpeseTotali)
     
-    // (RicaricheTotali - SpeseTotali) è il saldo "calcolato" puro, senza offset
-    const calculatedBase = currentWalletState.balance - (editingWallet.balanceOffset || 0);
+    // Usiamo il calculatedBalance reale (non clippato a zero) per calcolare l'offset corretto
+    const calculatedBase = currentWalletState.calculatedBalance;
     
     const newOffset = target - calculatedBase;
 
     setIsSubmitting(true);
-    
-    // Aggiorna la configurazione del wallet
-    const updatedWallets = wallets.map(w => 
-      w.id === editingWallet.id ? { ...w, balanceOffset: newOffset } : w
-    );
-    
-    onUpdateWallets(updatedWallets);
-    
-    setEditingWallet(null);
-    setIsSubmitting(false);
+    try {
+      // Aggiorna la configurazione del wallet
+      const updatedWallets = wallets.map(w => 
+        w.id === editingWallet.id ? { ...w, balanceOffset: newOffset } : w
+      );
+      
+      await onUpdateWallets(updatedWallets);
+      setEditingWallet(null);
+    } catch (e) {
+      console.error("Errore aggiornamento saldo:", e);
+      alert("Errore durante l'aggiornamento del saldo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getWalletIcon = (w: WalletConfig) => {
@@ -204,7 +209,7 @@ export const RicaricheView: React.FC<RicaricheViewProps> = ({ onRefill, onSaveEx
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nuovo Saldo Attuale</label>
               <input 
                 autoFocus
-                type="number" 
+                type="text" 
                 inputMode="decimal"
                 value={newBalance} 
                 onChange={(e) => setNewBalance(e.target.value)} 

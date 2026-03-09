@@ -455,12 +455,12 @@ const App: React.FC = () => {
   };
 
   const handleUpdateWallets = async (newWallets: WalletConfig[]) => {
-    const newSettings = { ...userSettings, wallets: newWallets };
-    setUserSettings(newSettings);
+    setUserSettings(prev => ({ ...prev, wallets: newWallets }));
     
     // Immediate sync to cloud
     if (session?.user?.id) {
       try {
+        const newSettings = { ...userSettings, wallets: newWallets };
         await db.updateProfileSettings(session.user.id, newSettings);
         setSuccessToast("Portafogli sincronizzati!");
         setTimeout(() => setSuccessToast(null), 2000);
