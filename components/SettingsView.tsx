@@ -1,8 +1,8 @@
 
 import React, { useState, useRef } from 'react';
 import { UserSettings, Expense, WalletConfig, CategoryConfig, PaymentMethod } from '../types';
-import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check, Upload, Loader2, Eraser } from 'lucide-react';
-import { auth } from '../services/supabase';
+import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, History, CheckCircle2, ShieldCheck, Edit3, X, Mail, Globe, Lock, Wallet, Tag, ChevronRight, Plus, ChevronLeft, Save, Check, Upload, Loader2, Eraser, RefreshCw } from 'lucide-react';
+import { auth, db } from '../services/supabase';
 import { format } from 'date-fns';
 import { HistoryView } from './HistoryView';
 import { translations } from '../utils/i18n';
@@ -38,6 +38,8 @@ interface SettingsViewProps {
   onExport?: () => void;
   expenses: Expense[];
   email?: string;
+  userId?: string;
+  onLogout: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
@@ -48,12 +50,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onImport,
   onExport,
   expenses,
-  email
+  email,
+  userId,
+  onLogout
 }) => {
   const [view, setView] = useState<'main' | 'history' | 'wallets' | 'categories'>('main');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   
   // States for adding new items
   const [isAdding, setIsAdding] = useState(false);
@@ -72,6 +77,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Local states for budget to allow explicit saving
+  const [localBudget, setLocalBudget] = useState(settings.monthlyBudget);
+  const [localCurrency, setLocalCurrency] = useState(settings.currency);
+
   const lang = settings.language || 'it';
   const t = translations[lang].settings;
   const tNav = translations[lang].nav;
@@ -79,6 +88,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const showFeedback = (msg: string) => {
     setFeedback(msg);
     setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const saveToCloud = async (updatedSettings: UserSettings) => {
+    if (!userId) return;
+    setIsSavingSettings(true);
+    try {
+      await db.updateProfileSettings(userId, updatedSettings);
+      showFeedback("Sincronizzato con il Cloud!");
+    } catch (err) {
+      console.error("Errore salvataggio cloud:", err);
+      showFeedback("Errore salvataggio Cloud");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleSaveBudget = async () => {
+    const currentMonthKey = format(new Date(), 'yyyy-MM');
+    const newHistory = { ...(settings.budgetHistory || {}) };
+    
+    // Aggiorna lo storico per il mese corrente
+    newHistory[currentMonthKey] = {
+      ...newHistory[currentMonthKey],
+      personal: localBudget
+    };
+
+    const updated = { 
+      ...settings, 
+      monthlyBudget: localBudget, 
+      currency: localCurrency,
+      budgetHistory: newHistory
+    };
+    onUpdate(updated);
+    await saveToCloud(updated);
   };
 
   const handleUpdateProfile = async () => {
@@ -130,9 +173,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  const handleAddItem = (type: 'wallet' | 'category') => {
+  const handleAddItem = async (type: 'wallet' | 'category') => {
     if (!newItemName.trim()) return;
     
+    let updatedSettings: UserSettings;
     if (type === 'wallet') {
       const newWallet: WalletConfig = {
         id: 'w' + Date.now(),
@@ -140,19 +184,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         method: newItemName.trim() as PaymentMethod,
         icon: 'credit-card'
       };
-      onUpdate({ ...settings, wallets: [...settings.wallets, newWallet] });
+      updatedSettings = { ...settings, wallets: [...settings.wallets, newWallet] };
     } else {
       const newCat: CategoryConfig = {
         id: 'c' + Date.now(),
         name: newItemName.trim(),
         color: newItemColor
       };
-      onUpdate({ ...settings, categories: [...settings.categories, newCat] });
+      updatedSettings = { ...settings, categories: [...settings.categories, newCat] };
     }
+    
+    onUpdate(updatedSettings);
+    await saveToCloud(updatedSettings);
     
     setNewItemName('');
     setIsAdding(false);
-    showFeedback("Aggiunto con successo!");
   };
 
   const startEditing = (item: CategoryConfig) => {
@@ -161,14 +207,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setEditColor(item.color || '#10b981');
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editName.trim()) return;
     const newCats = settings.categories.map(c => 
       c.id === editingId ? { ...c, name: editName, color: editColor } : c
     );
-    onUpdate({ ...settings, categories: newCats });
+    const updated = { ...settings, categories: newCats };
+    onUpdate(updated);
+    await saveToCloud(updated);
     setEditingId(null);
-    showFeedback("Modifica salvata!");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,9 +266,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
+  const handleManualRecovery = () => {
+    const localData = localStorage.getItem('mintflow_expenses');
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData);
+        if (parsed.length > 0) {
+          showFeedback(`Trovate ${parsed.length} spese. Avvio recupero...`);
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          showFeedback("Nessun dato trovato nella memoria locale di questo dispositivo.");
+        }
+      } catch (e) {
+        showFeedback("Errore nella lettura dei dati locali.");
+      }
+    } else {
+      showFeedback("Nessun dato trovato nella memoria locale di questo dispositivo.");
+    }
+  };
+
   // ... Resto del componente (view wallets, view categories, etc) rimane uguale, mostro solo la parte renderizzata finale
 
-  if (view === 'history') return <HistoryView expenses={expenses} onClose={() => setView('main')} currency={settings.currency} />;
+  if (view === 'history') return <HistoryView expenses={expenses} onClose={() => setView('main')} currency={settings.currency} settings={settings} />;
   
   if (view === 'wallets') return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
@@ -234,8 +300,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="flex items-center gap-3 font-bold dark:text-white"><Wallet className="text-emerald-500" /> {w.name}</div>
               <button 
                 type="button"
-                onClick={() => {
-                  onUpdate({ ...settings, wallets: settings.wallets.filter(x => x.id !== w.id) });
+                onClick={async () => {
+                  const updated = { ...settings, wallets: settings.wallets.filter(x => x.id !== w.id) };
+                  onUpdate(updated);
+                  await saveToCloud(updated);
                 }} 
                 className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center relative z-30"
               >
@@ -317,8 +385,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     {!c.isSubscriptionDefault && (
                       <button 
                         type="button"
-                        onClick={() => {
-                          onUpdate({ ...settings, categories: settings.categories.filter(x => x.id !== c.id) });
+                        onClick={async () => {
+                          const updated = { ...settings, categories: settings.categories.filter(x => x.id !== c.id) };
+                          onUpdate(updated);
+                          await saveToCloud(updated);
                         }} 
                         className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center"
                       >
@@ -412,10 +482,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><DollarSign className="text-emerald-500" size={20} /> {t.monthlyBudget}</h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2"><DollarSign className="text-emerald-500" size={20} /> {t.monthlyBudget}</h3>
+            <button 
+              onClick={handleSaveBudget}
+              disabled={isSavingSettings}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-xs hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-50"
+            >
+              {isSavingSettings ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Salva
+            </button>
+          </div>
           <div className="space-y-4">
-            <input type="number" value={settings.monthlyBudget} onChange={(e) => onUpdate({ ...settings, monthlyBudget: Number(e.target.value) })} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none dark:text-white font-black text-2xl" />
-            <select value={settings.currency} onChange={(e) => onUpdate({ ...settings, currency: e.target.value })} className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white px-4 py-3 rounded-2xl font-bold text-sm outline-none border-none">
+            <input 
+              type="number" 
+              value={localBudget} 
+              onChange={(e) => setLocalBudget(Number(e.target.value))} 
+              className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 outline-none dark:text-white font-black text-2xl" 
+            />
+            <select 
+              value={localCurrency} 
+              onChange={(e) => setLocalCurrency(e.target.value)} 
+              className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white px-4 py-3 rounded-2xl font-bold text-sm outline-none border-none"
+            >
               <option value="€">Euro (€)</option>
               <option value="$">Dollaro ($)</option>
               <option value="£">Sterlina (£)</option>
@@ -474,15 +563,58 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <p className="text-[10px] text-center text-gray-400 mt-2">Usa questo per rimuovere i vecchi dati prima del cambio nome in "Modifica".</p>
           </div>
         )}
+
+        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+          <button 
+            type="button" 
+            onClick={handleManualRecovery} 
+            className="w-full flex items-center justify-center gap-2 text-blue-500 text-xs font-bold uppercase tracking-wider hover:text-blue-600 transition-all p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20"
+          >
+            <RefreshCw size={16} /> Recupera Dati Locali
+          </button>
+          <p className="text-[10px] text-center text-gray-400 mt-2">Se non vedi le tue vecchie spese, clicca qui per caricarle sul cloud.</p>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-red-50 dark:border-red-900/10 shadow-sm">
         <h3 className="text-lg font-bold text-red-500 mb-6 flex items-center gap-2"><ShieldCheck size={20} /> {t.security}</h3>
         <div className="space-y-4">
-          <button type="button" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-3 p-5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-100 dark:hover:bg-gray-600 transition-all"><LogOut size={20} /> {t.logout}</button>
+          <button 
+            type="button" 
+            onClick={() => {
+              console.log("Logout button clicked in SettingsView (v2)");
+              if (onLogout) {
+                onLogout();
+              } else {
+                console.error("onLogout prop is missing in SettingsView!");
+                alert("Errore tecnico: funzione di logout non trovata.");
+              }
+            }} 
+            className="w-full flex items-center justify-center gap-3 p-5 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 shadow-lg shadow-red-100 transition-all active:scale-95"
+          >
+            <LogOut size={20} /> {t.logout || 'Disconnetti'}
+          </button>
           <div className="flex flex-col gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
             <button type="button" onClick={handleDeleteAccount} className="w-full py-3 text-red-400 text-xs font-bold hover:text-red-600 transition-all flex items-center justify-center gap-2"><Trash2 size={14} /> {t.deleteAccount}</button>
             <button type="button" onClick={onClearData} className="w-full flex items-center justify-center gap-2 text-gray-400 text-[10px] font-bold uppercase tracking-wider hover:text-red-500 transition-all"><Trash2 size={10} /> {t.clearData}</button>
+            <button 
+              type="button" 
+              onClick={async () => {
+                try {
+                  const isConnected = await db.checkConnection();
+                  if (isConnected) {
+                    showFeedback("Connessione DB OK!");
+                  } else {
+                    showFeedback("Errore Connessione DB");
+                  }
+                } catch (e) {
+                  showFeedback("Errore Test Connessione");
+                }
+              }} 
+              className="w-full flex items-center justify-center gap-2 text-emerald-500 text-[10px] font-bold uppercase tracking-wider hover:text-emerald-600 transition-all pt-2"
+            >
+              <RefreshCw size={10} /> Test Connessione DB
+            </button>
           </div>
         </div>
       </div>

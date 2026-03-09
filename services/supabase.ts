@@ -5,11 +5,24 @@ import { Expense, PaymentMethod, ProfileType, AppNotification } from '../types';
 const SUPABASE_URL = 'https://jpcweqcqysxgzycftzyv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storageKey: 'mintflow-user-auth-token',
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 // Client Admin opzionale (usato solo se la chiave è presente e valida)
-export const supabaseAdmin = createClient(SUPABASE_URL, 'SERVICE_ROLE_KEY_HERE', {
-  auth: { autoRefreshToken: false, persistSession: false }
+// Aggiunto storageKey dedicato per evitare conflitti con il client principale
+export const supabaseAdmin = createClient(SUPABASE_URL, import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'SERVICE_ROLE_KEY_HERE', {
+  auth: { 
+    autoRefreshToken: false, 
+    persistSession: false,
+    detectSessionInUrl: false,
+    storageKey: 'mintflow-admin-auth-token'
+  }
 });
 
 const PACK_SEP = ' |#| ';
@@ -96,12 +109,27 @@ export const auth = {
 };
 
 export const db = {
-  async upsertProfile(id: string, email: string, name: string) {
+  async upsertProfile(id: string, email: string, name: string, settings?: any) {
     const role = email === 'admin@mintflow.com' ? 'admin' : 'user';
+    const updateData: any = { id, email, display_name: name, role, last_login: new Date().toISOString() };
+    if (settings) updateData.settings = settings;
+    
     const { data, error } = await supabase
       .from('profiles')
-      .upsert({ id, email, display_name: name, role, last_login: new Date().toISOString() }, { onConflict: 'id' })
+      .upsert(updateData, { onConflict: 'id' })
       .select();
+    if (error) throw error;
+    return data;
+  },
+
+  async getProfile(id: string) {
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateProfileSettings(id: string, settings: any) {
+    const { data, error } = await supabase.from('profiles').update({ settings }).eq('id', id).select();
     if (error) throw error;
     return data;
   },
@@ -145,7 +173,12 @@ export const db = {
   },
 
   async getExpenses(userId: string): Promise<Expense[]> {
-    const { data, error } = await supabase.from('expenses').select('*').eq('user_id', userId).order('date', { ascending: false });
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(2000);
     if (error) throw error;
     return (data || []).map((e: any) => {
       const unpacked = unpackDescription(e.description);
@@ -194,5 +227,14 @@ export const db = {
 
   async deleteExpense(id: string) {
     await supabase.from('expenses').delete().eq('id', id);
+  },
+
+  async checkConnection() {
+    try {
+      const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
+      return !error;
+    } catch (e) {
+      return false;
+    }
   }
 };

@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
-import { Expense, PaymentMethod } from '../types';
+import { Expense, PaymentMethod, WalletConfig } from '../types';
 import { ArrowUpRight, ArrowDownLeft, Trash2, Plus, X, Check, Loader2, Info } from 'lucide-react';
 import { format } from 'date-fns';
-import it from 'date-fns/locale/it';
+import { it } from 'date-fns/locale/it';
 
 interface ExtraViewProps {
   expenses: Expense[];
   onAdd: (expense: Omit<Expense, 'id'>) => Promise<void>;
   onDelete: (id: string) => void;
   currency: string;
+  wallets: WalletConfig[];
+  currentProfile: string;
 }
 
-export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete, currency }) => {
+export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete, currency, wallets, currentProfile }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [transactionType, setTransactionType] = useState<'given' | 'received'>('given');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.Contanti);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<Expense | null>(null);
 
   // Calcolo saldo Extra
   const totalGiven = expenses.filter(e => e.extraType === 'given').reduce((acc, curr) => acc + curr.amount, 0);
@@ -33,15 +37,16 @@ export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete,
         description: description,
         amount: parseFloat(amount.replace(',', '.')),
         category: 'Extra',
-        paymentMethod: PaymentMethod.Contanti, // Default per Extra
+        paymentMethod,
         date: new Date().toISOString().split('T')[0],
         isExtra: true,
         extraType: transactionType,
-        profile: 'personal'
+        profile: currentProfile as any
       });
       setIsAdding(false);
       setDescription('');
       setAmount('');
+      setPaymentMethod(PaymentMethod.Contanti);
     } catch (err) {
       alert("Errore nel salvataggio");
     } finally {
@@ -105,7 +110,7 @@ export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete,
                   <span className={`font-bold ${expense.extraType === 'given' ? 'text-red-500' : 'text-emerald-500'}`}>
                     {expense.extraType === 'given' ? '-' : '+'}{currency}{expense.amount.toFixed(2)}
                   </span>
-                  <button onClick={() => onDelete(expense.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                  <button onClick={() => setItemToDelete(expense)} className="text-gray-300 hover:text-red-500 transition-colors">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -154,6 +159,17 @@ export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete,
                 />
               </div>
 
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Metodo di Pagamento</label>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+                  {[PaymentMethod.Bancomat, ...wallets.map(w => w.method)].map((m) => (
+                    <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex items-center gap-2 px-3 py-3 rounded-xl text-[10px] font-bold border-2 transition-all ${paymentMethod === m ? 'bg-indigo-500 border-indigo-500 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-indigo-50 dark:border-gray-700 text-gray-500'}`}>
+                      <span className="truncate">{wallets.find(w => w.method === m)?.name || m}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button 
                 type="submit"
                 disabled={isSubmitting}
@@ -164,6 +180,41 @@ export const ExtraView: React.FC<ExtraViewProps> = ({ expenses, onAdd, onDelete,
                 {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />} Salva
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE DI CONFERMA ELIMINAZIONE */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-emerald-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl text-center animate-in zoom-in-95 duration-300 border-4 border-red-500">
+            <div className="bg-red-100 dark:bg-red-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+              <Trash2 size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+              Elimina Movimento
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 leading-relaxed font-medium">
+              Sei sicuro di voler eliminare questo movimento "{itemToDelete.description}"? L'azione è irreversibile.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  onDelete(itemToDelete.id);
+                  setItemToDelete(null);
+                }}
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-red-600 transition-colors"
+              >
+                <Trash2 size={18} />
+                Elimina
+              </button>
+              <button 
+                onClick={() => setItemToDelete(null)}
+                className="w-full py-3 text-gray-400 font-bold hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
+                Annulla
+              </button>
+            </div>
           </div>
         </div>
       )}

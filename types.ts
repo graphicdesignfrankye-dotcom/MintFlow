@@ -30,6 +30,7 @@ export interface Expense {
   profile?: ProfileType; 
   isExtra?: boolean; // Nuovo: Indica se è una spesa Extra
   extraType?: 'given' | 'received'; // Nuovo: Dato o Ricevuto
+  _isLocal?: boolean; // Flag per indicare se la spesa è salvata solo localmente (non sincronizzata)
 }
 
 export interface WalletConfig {
@@ -54,6 +55,7 @@ export interface UserSettings {
   currentProfile: ProfileType; // Profilo attualmente selezionato
   monthlyOffset?: number; // Offset manuale per il totale spese mensile
   lastOffsetDate?: string; // Data dell'ultimo offset manuale (per reset mensile)
+  budgetHistory?: Record<string, { personal: number; joint?: number }>; // Storico budget per mese (YYYY-MM)
 }
 
 export interface AiInsight {

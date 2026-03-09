@@ -8,6 +8,7 @@ interface AuthProps {
 }
 
 export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
+  console.log("[Auth] Rendering Auth component...");
   const [isLogin, setIsLogin] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);

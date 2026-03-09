@@ -12,17 +12,30 @@ interface LayoutProps {
   setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra') => void;
   lang?: 'it' | 'en';
   currentProfile?: ProfileType;
+  onRefresh?: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it', currentProfile = 'personal' }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it', currentProfile = 'personal', onRefresh }) => {
   const t = translations[lang].nav;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotifListOpen, setIsNotifListOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(null);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Stato per il modal di conferma eliminazione
   const [confirmDelete, setConfirmDelete] = useState<{isOpen: boolean, id: string | null}>({ isOpen: false, id: null });
+
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      setIsRefreshing(true);
+      try {
+        await supabase.auth.refreshSession();
+        await onRefresh();
+      } catch (e) {}
+      setTimeout(() => setIsRefreshing(false), 1000);
+    }
+  };
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -109,9 +122,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             </div>
 
             {/* Notification Bell */}
-            <div className="relative">
-              <button 
-                onClick={() => setIsNotifListOpen(!isNotifListOpen)}
+            <div className="flex items-center gap-2">
+              {onRefresh && (
+                <button 
+                  onClick={handleRefresh}
+                  className={`p-2 rounded-xl transition-all text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-800 ${isRefreshing ? 'animate-spin text-emerald-500' : ''}`}
+                  title="Aggiorna dati"
+                >
+                  <Repeat size={20} />
+                </button>
+              )}
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setIsNotifListOpen(!isNotifListOpen)}
                 className={`p-2 rounded-xl transition-all relative ${isNotifListOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-800'}`}
               >
                 <Bell size={20} />
@@ -153,6 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               )}
             </div>
           </div>
+        </div>
 
           <div className="hidden md:flex items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
             <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={18} />} label={t.dashboard} />
