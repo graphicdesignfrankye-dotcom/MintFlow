@@ -417,42 +417,35 @@ const App: React.FC = () => {
   useEffect(() => {
     if (session?.user?.id && !isInitialLoading && !isLoading) {
       try {
-        const sourceExpenses = allExpenses;
-        
-        const balances = userSettings.wallets.map(w => {
-          const name = w.name.toLowerCase();
-          
-          const totalIn = sourceExpenses
-            .filter(e => {
-              const desc = e.description.toLowerCase();
-              const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
-              const isExtraReceived = e.isExtra && e.extraType === 'received' && e.paymentMethod === w.method;
-              
-              return (isInflow && e.paymentMethod !== w.method) || isExtraReceived;
-            })
-            .reduce((sum, e) => sum + e.amount, 0);
-          
-          const totalOut = sourceExpenses
-            .filter(e => {
-              const desc = e.description.toLowerCase();
-              const isWalletMethod = e.paymentMethod === w.method;
-              const isInflowOfThisWallet = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
-              const isExtraReceived = e.isExtra && e.extraType === 'received';
-              
-              const [y, m, d] = e.date.split('-').map(Number);
-              const expenseDate = new Date(y, m - 1, d);
-              const isFutureDate = expenseDate > new Date();
-              
-              return isWalletMethod && !isInflowOfThisWallet && !isExtraReceived && !isFutureDate;
-            })
-            .reduce((sum, e) => sum + e.amount, 0);
-          
-          const calculatedBalance = totalIn - totalOut;
-          return Math.max(0, calculatedBalance + (w.balanceOffset || 0));
+        const currentMonthDate = new Date();
+        const currentMonthExpenses = expenses.filter(e => {
+          const [y, m, d] = e.date.split('-').map(Number);
+          const expenseDate = new Date(y, m - 1, d);
+          return isSameMonth(expenseDate, currentMonthDate);
         });
 
-        const totalBalance = balances.reduce((sum, val) => sum + val, 0);
-        const formattedBalance = totalBalance.toFixed(2);
+        const calculatedTotal = currentMonthExpenses
+          .filter(e => {
+             const [y, m, d] = e.date.split('-').map(Number);
+             const expenseDate = new Date(y, m - 1, d);
+             if (expenseDate > new Date()) return false;
+
+             const isRefill = e.description.toLowerCase().includes('ricarica');
+             const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
+             return !isRefill && !isAdjustment;
+          })
+          .reduce((sum, e) => sum + e.amount, 0);
+
+        let validOffset = 0;
+        if (userSettings?.monthlyOffset) {
+          const lastDate = userSettings.lastOffsetDate ? new Date(userSettings.lastOffsetDate) : null;
+          if (lastDate && isSameMonth(lastDate, currentMonthDate)) {
+            validOffset = userSettings.monthlyOffset;
+          }
+        }
+
+        const totalCurrentMonth = Math.max(0, calculatedTotal + validOffset);
+        const formattedSpeso = totalCurrentMonth.toFixed(2);
 
         const recentTransactions = [...allExpenses]
           .sort((a, b) => {
@@ -469,7 +462,7 @@ const App: React.FC = () => {
 
         if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mintflowBridge) {
           window.webkit.messageHandlers.mintflowBridge.postMessage({
-            "saldo": formattedBalance,
+            "spesoQuestoMese": formattedSpeso,
             "movimenti": recentTransactions
           });
         }
@@ -477,7 +470,7 @@ const App: React.FC = () => {
         console.error("Errore invio dati a iOS:", error);
       }
     }
-  }, [session, isInitialLoading, isLoading, allExpenses, userSettings.wallets, userSettings.currency]);
+  }, [session, isInitialLoading, isLoading, allExpenses, expenses, userSettings]);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
