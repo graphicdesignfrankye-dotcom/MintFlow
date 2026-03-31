@@ -447,6 +447,41 @@ const App: React.FC = () => {
         const totalCurrentMonth = Math.max(0, calculatedTotal + validOffset);
         const formattedSpeso = totalCurrentMonth.toFixed(2);
 
+        const balances = userSettings.wallets.map(w => {
+          const name = w.name.toLowerCase();
+          
+          const totalIn = allExpenses
+            .filter(e => {
+              const desc = e.description.toLowerCase();
+              const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
+              const isExtraReceived = e.isExtra && e.extraType === 'received' && e.paymentMethod === w.method;
+              
+              return (isInflow && e.paymentMethod !== w.method) || isExtraReceived;
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+          
+          const totalOut = allExpenses
+            .filter(e => {
+              const desc = e.description.toLowerCase();
+              const isWalletMethod = e.paymentMethod === w.method;
+              const isInflowOfThisWallet = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
+              const isExtraReceived = e.isExtra && e.extraType === 'received';
+              
+              const [y, m, d] = e.date.split('-').map(Number);
+              const expenseDate = new Date(y, m - 1, d);
+              const isFutureDate = expenseDate > new Date();
+              
+              return isWalletMethod && !isInflowOfThisWallet && !isExtraReceived && !isFutureDate;
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+          
+          const calculatedBalance = totalIn - totalOut;
+          return {
+            nome: w.name,
+            saldo: Math.max(0, calculatedBalance + (w.balanceOffset || 0))
+          };
+        });
+
         const recentTransactions = [...allExpenses]
           .sort((a, b) => {
             const [yA, mA, dA] = a.date.split('-').map(Number);
@@ -463,6 +498,7 @@ const App: React.FC = () => {
         if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mintflowBridge) {
           window.webkit.messageHandlers.mintflowBridge.postMessage({
             "spesoQuestoMese": formattedSpeso,
+            "portafogli": balances,
             "movimenti": recentTransactions
           });
         }
