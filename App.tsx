@@ -452,7 +452,7 @@ const App: React.FC = () => {
         });
 
         const totalBalance = balances.reduce((sum, val) => sum + val, 0);
-        const formattedBalance = `${userSettings.currency}${totalBalance.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
+        const formattedBalance = totalBalance.toFixed(2);
 
         const recentTransactions = [...allExpenses]
           .sort((a, b) => {
@@ -460,15 +460,18 @@ const App: React.FC = () => {
             const [yB, mB, dB] = b.date.split('-').map(Number);
             return new Date(yB, mB - 1, dB).getTime() - new Date(yA, mA - 1, dA).getTime();
           })
-          .slice(0, 10);
+          .slice(0, 10)
+          .map(e => ({
+            titolo: e.description,
+            importo: e.amount,
+            isIncome: !!(e.isExtra && e.extraType === 'received')
+          }));
 
-        const dati = {
-          saldo: formattedBalance,
-          transazioni: recentTransactions
-        };
-
-        if ((window as any).webkit?.messageHandlers?.mintflowBridge) {
-          (window as any).webkit.messageHandlers.mintflowBridge.postMessage(JSON.stringify(dati));
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mintflowBridge) {
+          window.webkit.messageHandlers.mintflowBridge.postMessage({
+            "saldo": formattedBalance,
+            "movimenti": recentTransactions
+          });
         }
       } catch (error) {
         console.error("Errore invio dati a iOS:", error);
