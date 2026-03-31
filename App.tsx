@@ -413,6 +413,69 @@ const App: React.FC = () => {
     }
   }, [session, fetchExpenses]);
 
+  // --- INTEGRAZIONE IOS APP NATIVA ---
+  useEffect(() => {
+    if (session?.user?.id && !isInitialLoading && !isLoading) {
+      try {
+        const sourceExpenses = allExpenses;
+        
+        const balances = userSettings.wallets.map(w => {
+          const name = w.name.toLowerCase();
+          
+          const totalIn = sourceExpenses
+            .filter(e => {
+              const desc = e.description.toLowerCase();
+              const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
+              const isExtraReceived = e.isExtra && e.extraType === 'received' && e.paymentMethod === w.method;
+              
+              return (isInflow && e.paymentMethod !== w.method) || isExtraReceived;
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+          
+          const totalOut = sourceExpenses
+            .filter(e => {
+              const desc = e.description.toLowerCase();
+              const isWalletMethod = e.paymentMethod === w.method;
+              const isInflowOfThisWallet = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
+              const isExtraReceived = e.isExtra && e.extraType === 'received';
+              
+              const [y, m, d] = e.date.split('-').map(Number);
+              const expenseDate = new Date(y, m - 1, d);
+              const isFutureDate = expenseDate > new Date();
+              
+              return isWalletMethod && !isInflowOfThisWallet && !isExtraReceived && !isFutureDate;
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+          
+          const calculatedBalance = totalIn - totalOut;
+          return Math.max(0, calculatedBalance + (w.balanceOffset || 0));
+        });
+
+        const totalBalance = balances.reduce((sum, val) => sum + val, 0);
+        const formattedBalance = `${userSettings.currency}${totalBalance.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
+
+        const recentTransactions = [...allExpenses]
+          .sort((a, b) => {
+            const [yA, mA, dA] = a.date.split('-').map(Number);
+            const [yB, mB, dB] = b.date.split('-').map(Number);
+            return new Date(yB, mB - 1, dB).getTime() - new Date(yA, mA - 1, dA).getTime();
+          })
+          .slice(0, 10);
+
+        const dati = {
+          saldo: formattedBalance,
+          transazioni: recentTransactions
+        };
+
+        if ((window as any).webkit?.messageHandlers?.mintflowBridge) {
+          (window as any).webkit.messageHandlers.mintflowBridge.postMessage(JSON.stringify(dati));
+        }
+      } catch (error) {
+        console.error("Errore invio dati a iOS:", error);
+      }
+    }
+  }, [session, isInitialLoading, isLoading, allExpenses, userSettings.wallets, userSettings.currency]);
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleForcedLogout = async () => {
