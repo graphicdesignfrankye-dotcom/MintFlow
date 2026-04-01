@@ -415,98 +415,116 @@ const App: React.FC = () => {
 
   // --- INTEGRAZIONE IOS APP NATIVA ---
   useEffect(() => {
-    if (session?.user?.id && !isInitialLoading && !isLoading) {
-      try {
-        const currentMonthDate = new Date();
-        const currentMonthExpenses = expenses.filter(e => {
-          const [y, m, d] = e.date.split('-').map(Number);
-          const expenseDate = new Date(y, m - 1, d);
-          return isSameMonth(expenseDate, currentMonthDate);
-        });
-
-        const calculatedTotal = currentMonthExpenses
-          .filter(e => {
-             const [y, m, d] = e.date.split('-').map(Number);
-             const expenseDate = new Date(y, m - 1, d);
-             if (expenseDate > new Date()) return false;
-
-             const isRefill = e.description.toLowerCase().includes('ricarica');
-             const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
-             return !isRefill && !isAdjustment;
-          })
-          .reduce((sum, e) => sum + e.amount, 0);
-
-        let validOffset = 0;
-        if (userSettings?.monthlyOffset) {
-          const lastDate = userSettings.lastOffsetDate ? new Date(userSettings.lastOffsetDate) : null;
-          if (lastDate && isSameMonth(lastDate, currentMonthDate)) {
-            validOffset = userSettings.monthlyOffset;
-          }
-        }
-
-        const totalCurrentMonth = Math.max(0, calculatedTotal + validOffset);
-        const formattedSpeso = totalCurrentMonth.toFixed(2);
-
-        const balances = userSettings.wallets.map(w => {
-          const name = w.name.toLowerCase();
-          
-          const totalIn = allExpenses
-            .filter(e => {
-              const desc = e.description.toLowerCase();
-              const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
-              const isExtraReceived = e.isExtra && e.extraType === 'received' && e.paymentMethod === w.method;
-              
-              return (isInflow && e.paymentMethod !== w.method) || isExtraReceived;
-            })
-            .reduce((sum, e) => sum + e.amount, 0);
-          
-          const totalOut = allExpenses
-            .filter(e => {
-              const desc = e.description.toLowerCase();
-              const isWalletMethod = e.paymentMethod === w.method;
-              const isInflowOfThisWallet = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
-              const isExtraReceived = e.isExtra && e.extraType === 'received';
-              
-              const [y, m, d] = e.date.split('-').map(Number);
-              const expenseDate = new Date(y, m - 1, d);
-              const isFutureDate = expenseDate > new Date();
-              
-              return isWalletMethod && !isInflowOfThisWallet && !isExtraReceived && !isFutureDate;
-            })
-            .reduce((sum, e) => sum + e.amount, 0);
-          
-          const calculatedBalance = totalIn - totalOut;
-          return {
-            nome: w.name,
-            saldo: Math.max(0, calculatedBalance + (w.balanceOffset || 0))
-          };
-        });
-
-        const recentTransactions = [...allExpenses]
-          .sort((a, b) => {
-            const [yA, mA, dA] = a.date.split('-').map(Number);
-            const [yB, mB, dB] = b.date.split('-').map(Number);
-            return new Date(yB, mB - 1, dB).getTime() - new Date(yA, mA - 1, dA).getTime();
-          })
-          .slice(0, 10)
-          .map(e => ({
-            titolo: e.description,
-            importo: e.amount,
-            isIncome: !!(e.isExtra && e.extraType === 'received')
-          }));
-
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mintflowBridge) {
-          window.webkit.messageHandlers.mintflowBridge.postMessage({
-            "spesoQuestoMese": formattedSpeso,
-            "portafogli": balances,
-            "movimenti": recentTransactions
+    const sendDataToIOS = () => {
+      if (session?.user?.id && !isInitialLoading && !isLoading && activeTab === 'dashboard') {
+        try {
+          const currentMonthDate = new Date();
+          const currentMonthExpenses = expenses.filter(e => {
+            const [y, m, d] = e.date.split('-').map(Number);
+            const expenseDate = new Date(y, m - 1, d);
+            return isSameMonth(expenseDate, currentMonthDate);
           });
+
+          const calculatedTotal = currentMonthExpenses
+            .filter(e => {
+               const [y, m, d] = e.date.split('-').map(Number);
+               const expenseDate = new Date(y, m - 1, d);
+               if (expenseDate > new Date()) return false;
+
+               const isRefill = e.description.toLowerCase().includes('ricarica');
+               const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
+               return !isRefill && !isAdjustment;
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+
+          let validOffset = 0;
+          if (userSettings?.monthlyOffset) {
+            const lastDate = userSettings.lastOffsetDate ? new Date(userSettings.lastOffsetDate) : null;
+            if (lastDate && isSameMonth(lastDate, currentMonthDate)) {
+              validOffset = userSettings.monthlyOffset;
+            }
+          }
+
+          const totalCurrentMonth = Math.max(0, calculatedTotal + validOffset);
+          const formattedSpeso = totalCurrentMonth.toFixed(2);
+
+          const balances = userSettings.wallets.map(w => {
+            const name = w.name.toLowerCase();
+            
+            const totalIn = allExpenses
+              .filter(e => {
+                const desc = e.description.toLowerCase();
+                const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
+                const isExtraReceived = e.isExtra && e.extraType === 'received' && e.paymentMethod === w.method;
+                
+                return (isInflow && e.paymentMethod !== w.method) || isExtraReceived;
+              })
+              .reduce((sum, e) => sum + e.amount, 0);
+            
+            const totalOut = allExpenses
+              .filter(e => {
+                const desc = e.description.toLowerCase();
+                const isWalletMethod = e.paymentMethod === w.method;
+                const isInflowOfThisWallet = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
+                const isExtraReceived = e.isExtra && e.extraType === 'received';
+                
+                const [y, m, d] = e.date.split('-').map(Number);
+                const expenseDate = new Date(y, m - 1, d);
+                const isFutureDate = expenseDate > new Date();
+                
+                return isWalletMethod && !isInflowOfThisWallet && !isExtraReceived && !isFutureDate;
+              })
+              .reduce((sum, e) => sum + e.amount, 0);
+            
+            const calculatedBalance = totalIn - totalOut;
+            return {
+              nome: w.name,
+              saldo: Math.max(0, calculatedBalance + (w.balanceOffset || 0))
+            };
+          });
+
+          const recentTransactions = [...allExpenses]
+            .sort((a, b) => {
+              const [yA, mA, dA] = a.date.split('-').map(Number);
+              const [yB, mB, dB] = b.date.split('-').map(Number);
+              return new Date(yB, mB - 1, dB).getTime() - new Date(yA, mA - 1, dA).getTime();
+            })
+            .slice(0, 10)
+            .map(e => ({
+              titolo: e.description,
+              importo: e.amount,
+              isIncome: !!(e.isExtra && e.extraType === 'received')
+            }));
+
+          if ((window as any).webkit && (window as any).webkit.messageHandlers && (window as any).webkit.messageHandlers.mintflowBridge) {
+            (window as any).webkit.messageHandlers.mintflowBridge.postMessage({
+              "spesoQuestoMese": formattedSpeso,
+              "portafogli": balances,
+              "movimenti": recentTransactions
+            });
+          }
+        } catch (error) {
+          console.error("Errore invio dati a iOS:", error);
         }
-      } catch (error) {
-        console.error("Errore invio dati a iOS:", error);
       }
-    }
-  }, [session, isInitialLoading, isLoading, allExpenses, expenses, userSettings]);
+    };
+
+    // Invia i dati subito (se siamo nella dashboard e i dati sono pronti)
+    sendDataToIOS();
+
+    // Invia i dati ogni volta che l'app torna in primo piano (es. riapertura app iOS)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        sendDataToIOS();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [session, isInitialLoading, isLoading, allExpenses, expenses, userSettings, activeTab]);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
