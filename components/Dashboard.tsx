@@ -468,8 +468,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider min-w-[80px] text-center">
-              {format(chartDate, 'yyyy', { locale: dateLocale })}
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider min-w-[120px] text-center">
+              {format(subMonths(chartDate, 5), 'MMM yyyy', { locale: dateLocale })} - {format(chartDate, 'MMM yyyy', { locale: dateLocale })}
             </span>
             <button 
               onClick={() => setChartDate(addMonths(chartDate, 6))}

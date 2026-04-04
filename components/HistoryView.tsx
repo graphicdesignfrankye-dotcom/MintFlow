@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Expense, UserSettings } from '../types';
 import { format, isSameMonth, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale/it';
-import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils, TrendingDown, TrendingUp, Filter } from 'lucide-react';
 
 interface HistoryViewProps {
   expenses: Expense[];
@@ -24,6 +24,8 @@ interface YearGroup {
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, currency, settings }) => {
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>('Tutti');
+  const [hideBancomat, setHideBancomat] = useState(false);
 
   const parseDate = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -47,6 +49,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
       
       // Escludi il mese in corso dallo storico
       if (isSameMonth(monthStart, currentMonth)) return;
+      
+      // Filtra per categoria
+      if (filterCategory !== 'Tutti' && e.category !== filterCategory) return;
 
       const key = format(monthStart, 'yyyy-MM');
       if (!monthGroups[key]) {
@@ -70,7 +75,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
     });
 
     return groups;
-  }, [expenses]);
+  }, [expenses, filterCategory]);
 
   const getMonthBudget = (monthDate: Date) => {
     const key = format(monthDate, 'yyyy-MM');
@@ -100,16 +105,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
         const desc = e.description.toLowerCase();
         return !(desc.includes('aggiustamento') || desc.includes('modifica saldo') || (desc.includes('modifica') && desc.includes('contanti')));
       })
+      .filter(e => filterCategory === 'Tutti' || e.category === filterCategory)
+      .filter(e => !hideBancomat || e.paymentMethod !== 'Bancomat')
       .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
-  }, [expenses, selectedMonth]);
+  }, [expenses, selectedMonth, filterCategory, hideBancomat]);
 
   const exportToCSV = () => {
-    if (!expenses || expenses.length === 0) return;
+    const filteredExpenses = filterCategory === 'Tutti' 
+      ? expenses 
+      : expenses.filter(e => e.category === filterCategory);
+
+    if (!filteredExpenses || filteredExpenses.length === 0) return;
     
     const headers = ['Data', 'Descrizione', 'Categoria', 'Metodo di Pagamento', 'Importo'];
     const csvContent = [
       headers.join(','),
-      ...expenses.map(e => {
+      ...filteredExpenses.map(e => {
         const date = format(parseDate(e.date), 'dd/MM/yyyy');
         const desc = `"${e.description.replace(/"/g, '""')}"`;
         const category = `"${e.category}"`;
@@ -137,7 +148,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
         <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
           <header className="flex items-center justify-between mb-8">
             <button 
-              onClick={() => setSelectedMonth(null)}
+              onClick={() => { setSelectedMonth(null); setFilterCategory('Tutti'); }}
               className="p-2 hover:bg-emerald-50 dark:hover:bg-gray-800 rounded-full text-emerald-600 transition-colors"
             >
               <ChevronLeft size={28} />
@@ -150,6 +161,42 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
             </div>
             <div className="w-10"></div>
           </header>
+
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <button
+              onClick={() => setHideBancomat(!hideBancomat)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                hideBancomat 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+              }`}
+            >
+              {hideBancomat ? 'Mostra Bancomat' : 'Nascondi Bancomat'}
+            </button>
+
+            <div className="relative min-w-[160px]">
+              <select 
+                value={filterCategory} 
+                onChange={(e) => setFilterCategory(e.target.value)} 
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white outline-none bg-white appearance-none cursor-pointer pr-10 truncate text-sm font-medium"
+              >
+                <option value="Tutti">Cat: Tutte</option>
+                {settings.categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <Filter size={14} />
+              </div>
+            </div>
+          </div>
+
+          {(hideBancomat || filterCategory !== 'Tutti') && (
+            <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-center">
+              <p className="text-emerald-800 dark:text-emerald-200 text-sm font-bold">
+                Totale speso {hideBancomat ? '(escluso Bancomat)' : ''} {filterCategory !== 'Tutti' ? `(Categoria: ${filterCategory})` : ''}: {currency}
+                {monthExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          )}
 
           <div className="bg-white dark:bg-gray-800 rounded-[2rem] border border-emerald-100 dark:border-gray-700 overflow-hidden shadow-sm">
             {monthExpenses.length > 0 ? (
@@ -222,7 +269,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Archivio Storico</h1>
             <p className="text-gray-500 text-sm font-medium">I tuoi dati organizzati per anno</p>
           </div>
-          <div className="w-10"></div>
+          <div className="relative min-w-[140px]">
+            <select 
+              value={filterCategory} 
+              onChange={(e) => setFilterCategory(e.target.value)} 
+              className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white outline-none bg-white appearance-none cursor-pointer pr-8 truncate text-xs font-bold"
+            >
+              <option value="Tutti">Tutte le Cat.</option>
+              {settings.categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+              <Filter size={12} />
+            </div>
+          </div>
         </header>
 
         {yearlyData.length > 0 ? (
