@@ -43,6 +43,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
   };
 
   useEffect(() => {
+    let channel: any;
     const fetchAndSubscribe = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -50,8 +51,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       const data = await db.getNotifications(user.id);
       setNotifications(data);
 
-      const channel = supabase
-        .channel(`user-notifs-${user.id}`)
+      const channelName = `user-notifs-${user.id}`;
+      // Rimuovi eventuali canali esistenti con lo stesso nome per evitare l'errore "after subscribe"
+      const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+      if (existingChannel) {
+        await supabase.removeChannel(existingChannel);
+      }
+
+      channel = supabase
+        .channel(channelName)
         .on('postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
           (payload) => {
@@ -59,11 +67,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           }
         )
         .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
     };
 
     fetchAndSubscribe();
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, []);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;

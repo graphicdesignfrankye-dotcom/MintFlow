@@ -54,6 +54,8 @@ export interface UserSettings {
   lastJointBudgetUpdate?: string; // Data update cointestato
   currentProfile: ProfileType; // Profilo attualmente selezionato
   monthlyOffset?: number; // Offset manuale per il totale spese mensile
+  monthlyIncome?: number; // Nuovo: Entrate manuali
+  monthlyOutcome?: number; // Nuovo: Uscite manuali
   lastOffsetDate?: string; // Data dell'ultimo offset manuale (per reset mensile)
   budgetHistory?: Record<string, { personal: number; joint?: number }>; // Storico budget per mese (YYYY-MM)
 }

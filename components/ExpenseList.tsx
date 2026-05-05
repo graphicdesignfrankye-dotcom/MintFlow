@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { Expense, PaymentMethod, WalletConfig, CategoryConfig } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Expense, PaymentMethod, WalletConfig, CategoryConfig, UserSettings } from '../types';
 import { 
   Trash2, Search, Filter, Edit2, AlertCircle, 
   Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils,
-  CreditCard, SlidersHorizontal, CloudOff
+  CreditCard, SlidersHorizontal, CloudOff, ArrowUpCircle, ArrowDownCircle, Check, X
 } from 'lucide-react';
-import { format, isFuture, isBefore, startOfMonth } from 'date-fns';
+import { format, isFuture, isBefore, startOfMonth, isSameMonth } from 'date-fns';
 import { it } from 'date-fns/locale/it';
 
 interface ExpenseListProps {
@@ -15,13 +15,65 @@ interface ExpenseListProps {
   currency?: string;
   wallets: WalletConfig[];
   categories: CategoryConfig[];
+  userSettings?: UserSettings;
+  onUpdateSettings?: (settings: UserSettings) => void;
 }
 
-export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit, currency = '€', wallets, categories }) => {
+export const ExpenseList: React.FC<ExpenseListProps> = ({ 
+  expenses, 
+  onDelete, 
+  onEdit, 
+  currency = '€', 
+  wallets, 
+  categories,
+  userSettings,
+  onUpdateSettings
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('Tutti');
   const [filterMethod, setFilterMethod] = useState<string>('Tutti');
   const [itemToDelete, setItemToDelete] = useState<Expense | null>(null);
+
+  const [isEditingIncome, setIsEditingIncome] = useState(false);
+  const [tempIncome, setTempIncome] = useState('');
+
+  const [isEditingOutcome, setIsEditingOutcome] = useState(false);
+  const [tempOutcome, setTempOutcome] = useState('');
+
+  const currentMonthDate = new Date();
+
+  // Spese del mese corrente (per il calcolo del totale uscite)
+  const realExpensesSum = useMemo(() => {
+    return expenses
+      .filter(e => {
+        const [y, m, d] = e.date.split('-').map(Number);
+        const expenseDate = new Date(y, m - 1, d);
+        if (!isSameMonth(expenseDate, currentMonthDate)) return false;
+        if (isFuture(expenseDate)) return false;
+
+        const desc = e.description.toLowerCase();
+        const isRefill = desc.includes('ricarica');
+        const isAdjustment = desc.includes('aggiustamento') || desc.includes('modifica');
+        return !isRefill && !isAdjustment;
+      })
+      .reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses]);
+
+  const handleSaveIncome = () => {
+    if (!userSettings || !onUpdateSettings) return;
+    const val = parseFloat(tempIncome.replace(',', '.'));
+    if (isNaN(val) || val < 0) return;
+    onUpdateSettings({ ...userSettings, monthlyIncome: val });
+    setIsEditingIncome(false);
+  };
+
+  const handleSaveOutcome = () => {
+    if (!userSettings || !onUpdateSettings) return;
+    const val = parseFloat(tempOutcome.replace(',', '.'));
+    if (isNaN(val) || val < 0) return;
+    onUpdateSettings({ ...userSettings, monthlyOutcome: val });
+    setIsEditingOutcome(false);
+  };
 
   const filteredExpenses = expenses
     .filter(e => {
@@ -84,6 +136,48 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
 
   return (
     <div className="space-y-4">
+      {/* Card Entrate/Uscite Manuali */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div 
+          onClick={() => { setTempIncome((userSettings?.monthlyIncome || 0).toString()); setIsEditingIncome(true); }}
+          className="bg-emerald-500/10 dark:bg-emerald-500/5 p-4 rounded-[1.5rem] border border-emerald-500/20 flex flex-col gap-2 cursor-pointer hover:bg-emerald-500/15 transition-all group"
+        >
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <ArrowUpCircle size={14} className="text-emerald-500" />
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Entrate</span>
+            </div>
+            <Edit2 size={10} className="text-emerald-500 opacity-0 group-hover:opacity-100" />
+          </div>
+          <p className="text-lg font-black text-emerald-700 dark:text-emerald-300">
+            {currency}{(userSettings?.monthlyIncome || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div 
+          onClick={() => { setTempOutcome((userSettings?.monthlyOutcome || 0).toString()); setIsEditingOutcome(true); }}
+          className="bg-red-500/10 dark:bg-red-500/5 p-4 rounded-[1.5rem] border border-red-500/20 flex flex-col gap-2 cursor-pointer hover:bg-red-500/15 transition-all group"
+        >
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <ArrowDownCircle size={14} className="text-red-500" />
+              <span className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest">Uscite</span>
+            </div>
+            <Edit2 size={10} className="text-red-500 opacity-0 group-hover:opacity-100" />
+          </div>
+          <div>
+            <p className="text-lg font-black text-red-700 dark:text-red-300 leading-none">
+              {currency}{(realExpensesSum + (userSettings?.monthlyOutcome || 0)).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+            </p>
+            {(userSettings?.monthlyOutcome || 0) > 0 && (
+              <p className="text-[9px] text-red-500/60 font-medium mt-1">
+                (Spese: {currency}{realExpensesSum.toLocaleString('it-IT')} + Extra: {currency}{userSettings?.monthlyOutcome.toLocaleString('it-IT')})
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -251,6 +345,65 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                 Annulla
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE EDIT ENTRATE --- */}
+      {isEditingIncome && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-6 md:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold dark:text-white">Modifica Entrate</h3>
+              <button onClick={() => setIsEditingIncome(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Importo Entrate</label>
+              <input 
+                autoFocus
+                type="number" 
+                inputMode="decimal"
+                value={tempIncome} 
+                onChange={(e) => setTempIncome(e.target.value)} 
+                className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-black text-2xl" 
+              />
+            </div>
+            <button 
+              onClick={handleSaveIncome}
+              className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-emerald-600 transition-colors"
+            >
+              <Check size={20} /> Salva
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE EDIT USCITE --- */}
+      {isEditingOutcome && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-6 md:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold dark:text-white">Modifica Spese Extra</h3>
+              <button onClick={() => setIsEditingOutcome(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Importo Uscite Extra</label>
+              <input 
+                autoFocus
+                type="number" 
+                inputMode="decimal"
+                value={tempOutcome} 
+                onChange={(e) => setTempOutcome(e.target.value)} 
+                className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-emerald-500 dark:text-emerald-400 outline-none font-black text-2xl" 
+              />
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">*Questo valore si sommerà alle spese reali registrate.</p>
+            </div>
+            <button 
+              onClick={handleSaveOutcome}
+              className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 hover:bg-red-600 transition-colors"
+            >
+              <Check size={20} /> Salva
+            </button>
           </div>
         </div>
       )}

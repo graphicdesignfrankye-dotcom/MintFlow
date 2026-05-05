@@ -114,7 +114,13 @@ const App: React.FC = () => {
     if (!session?.user?.id) return;
 
     // Ascolta i cambiamenti delle impostazioni dagli altri dispositivi tramite la tabella profiles
-    const settingsChannel = supabase.channel(`settings_sync_${session.user.id}`)
+    const channelName = `settings_sync_${session.user.id}`;
+    const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+    if (existingChannel) {
+      supabase.removeChannel(existingChannel);
+    }
+
+    const settingsChannel = supabase.channel(channelName)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -227,9 +233,15 @@ const App: React.FC = () => {
           await db.upsertProfile(currentSession.user.id, currentSession.user.email || '', displayName);
         }
 
-        if (channel) supabase.removeChannel(channel);
+        const channelName = `security-${currentSession.user.id}`;
+        // Rimuovi eventuali canali esistenti con lo stesso nome per evitare l'errore "after subscribe"
+        const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+        if (existingChannel) {
+          await supabase.removeChannel(existingChannel);
+        }
+
         channel = supabase
-          .channel(`security-${currentSession.user.id}`)
+          .channel(channelName)
           .on('postgres_changes', { 
             event: 'UPDATE', 
             schema: 'public', 
@@ -394,8 +406,14 @@ const App: React.FC = () => {
       fetchExpenses(); 
       
       // Sottoscrizione realtime per mantenere sincronizzati i dispositivi
+      const channelName = `public:expenses:user_id=eq.${session.user.id}`;
+      const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+      if (existingChannel) {
+        supabase.removeChannel(existingChannel);
+      }
+
       const expensesChannel = supabase
-        .channel(`public:expenses:user_id=eq.${session.user.id}`)
+        .channel(channelName)
         .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
@@ -856,7 +874,16 @@ const App: React.FC = () => {
         {activeTab === 'list' && (
           <div className="space-y-6">
             <button onClick={() => { setPrefill(null); setShowForm(true); }} className="w-full bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg transition-transform active:scale-95"><Plus size={20} /> Aggiungi Spesa</button>
-            <ExpenseList expenses={expenses} onDelete={handleDeleteExpense} onEdit={ex => { setPrefill(ex); setShowForm(true); }} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} />
+            <ExpenseList 
+              expenses={expenses} 
+              onDelete={handleDeleteExpense} 
+              onEdit={ex => { setPrefill(ex); setShowForm(true); }} 
+              currency={userSettings.currency} 
+              wallets={userSettings.wallets} 
+              categories={userSettings.categories} 
+              userSettings={userSettings}
+              onUpdateSettings={setUserSettings}
+            />
           </div>
         )}
         {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={handleUpdateWallets} expenses={allExpenses} currency={userSettings.currency} wallets={userSettings.wallets} />}

@@ -3,7 +3,7 @@ import { Expense, PaymentMethod, WalletConfig, CategoryConfig, UserSettings } fr
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
-import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown, SlidersHorizontal, Edit2, X, Check, Loader2, ChevronLeft, AlertTriangle } from 'lucide-react';
+import { Wallet, Calendar, Target, Zap, Fuel, CreditCard, Clock, ChevronRight, TrendingUp, TrendingDown, SlidersHorizontal, Edit2, X, Check, Loader2, ChevronLeft, AlertTriangle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { format, isSameMonth, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale/it';
 import { enUS } from 'date-fns/locale/en-US';
