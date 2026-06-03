@@ -40,6 +40,8 @@ interface SettingsViewProps {
   email?: string;
   userId?: string;
   onLogout: () => void;
+  onDeleteExpense?: (id: string) => Promise<void>;
+  onDeleteMultipleExpenses?: (ids: string[]) => Promise<void>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
@@ -52,7 +54,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   expenses,
   email,
   userId,
-  onLogout
+  onLogout,
+  onDeleteExpense,
+  onDeleteMultipleExpenses
 }) => {
   const [view, setView] = useState<'main' | 'history' | 'wallets' | 'categories'>('main');
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -287,7 +291,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // ... Resto del componente (view wallets, view categories, etc) rimane uguale, mostro solo la parte renderizzata finale
 
-  if (view === 'history') return <HistoryView expenses={expenses} onClose={() => setView('main')} currency={settings.currency} settings={settings} />;
+  if (view === 'history') return (
+    <HistoryView 
+      expenses={expenses} 
+      onClose={() => setView('main')} 
+      currency={settings.currency} 
+      settings={settings} 
+      onDeleteExpense={onDeleteExpense}
+      onDeleteMultipleExpenses={onDeleteMultipleExpenses}
+    />
+  );
   
   if (view === 'wallets') return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">

@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { Expense, UserSettings } from '../types';
 import { format, isSameMonth, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale/it';
-import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils, TrendingDown, TrendingUp, Filter } from 'lucide-react';
+import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils, TrendingDown, TrendingUp, Filter, Trash2 } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 
 interface HistoryViewProps {
   expenses: Expense[];
   onClose: () => void;
   currency: string;
   settings: UserSettings;
+  onDeleteExpense?: (id: string) => Promise<void>;
+  onDeleteMultipleExpenses?: (ids: string[]) => Promise<void>;
 }
 
 interface MonthData {
@@ -22,10 +25,15 @@ interface YearGroup {
   months: MonthData[];
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, currency, settings }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ 
+  expenses, onClose, currency, settings, onDeleteExpense, onDeleteMultipleExpenses 
+}) => {
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('Tutti');
   const [hideBancomat, setHideBancomat] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [showDeleteIndividualConfirm, setShowDeleteIndividualConfirm] = useState(false);
+  const [expenseIdToDelete, setExpenseIdToDelete] = useState<string | null>(null);
 
   const parseDate = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -143,6 +151,35 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
   };
 
   if (selectedMonth) {
+    const handleDeleteAllConfirm = async () => {
+      if (!selectedMonth || !onDeleteMultipleExpenses) return;
+      const ids = monthExpenses.map(e => e.id);
+      if (ids.length === 0) return;
+      try {
+        await onDeleteMultipleExpenses(ids);
+        setSelectedMonth(null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setShowDeleteAllConfirm(false);
+      }
+    };
+
+    const handleDeleteIndividualConfirm = async () => {
+      if (!expenseIdToDelete || !onDeleteExpense) return;
+      try {
+        await onDeleteExpense(expenseIdToDelete);
+        if (monthExpenses.length <= 1) {
+          setSelectedMonth(null);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setExpenseIdToDelete(null);
+        setShowDeleteIndividualConfirm(false);
+      }
+    };
+
     return (
       <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
         <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
@@ -159,7 +196,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
               </h1>
               <p className="text-gray-500 text-sm font-medium">{monthExpenses.length} transazioni</p>
             </div>
-            <div className="w-10"></div>
+            {monthExpenses.length > 0 && onDeleteMultipleExpenses ? (
+              <button
+                onClick={() => setShowDeleteAllConfirm(true)}
+                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full text-red-500 transition-colors"
+                title="Elimina tutte le spese di questo mese"
+              >
+                <Trash2 size={24} />
+              </button>
+            ) : (
+              <div className="w-10"></div>
+            )}
           </header>
 
           <div className="mb-6 flex items-center justify-between gap-4">
@@ -236,6 +283,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
                             <span className="text-[9px] font-bold text-red-500 uppercase tracking-tighter">In programma</span>
                           )}
                         </div>
+                        {onDeleteExpense && (
+                          <button
+                            onClick={() => {
+                              setExpenseIdToDelete(expense.id);
+                              setShowDeleteIndividualConfirm(true);
+                            }}
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all flex items-center justify-center shrink-0"
+                            title="Elimina spesa"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -248,6 +307,30 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ expenses, onClose, cur
             )}
           </div>
         </div>
+
+        {/* Confirmation Modals */}
+        <ConfirmModal
+          isOpen={showDeleteAllConfirm}
+          title="Elimina tutte le spese?"
+          message={`Sei sicuro di voler eliminare DEFINITIVAMENTE tutte le ${monthExpenses.length} spese registrate in questo mese? Questa azione non può essere annullata.`}
+          confirmText="Elimina Tutto"
+          type="danger"
+          onConfirm={handleDeleteAllConfirm}
+          onCancel={() => setShowDeleteAllConfirm(false)}
+        />
+
+        <ConfirmModal
+          isOpen={showDeleteIndividualConfirm}
+          title="Elimina questa spesa?"
+          message="Sei sicuro di voler eliminare definitivamente questa singola transazione dall'archivio?"
+          confirmText="Elimina"
+          type="danger"
+          onConfirm={handleDeleteIndividualConfirm}
+          onCancel={() => {
+            setExpenseIdToDelete(null);
+            setShowDeleteIndividualConfirm(false);
+          }}
+        />
       </div>
     );
   }

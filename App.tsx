@@ -888,7 +888,31 @@ const App: React.FC = () => {
         )}
         {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={handleUpdateWallets} expenses={allExpenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
         {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && <SettingsView settings={userSettings} onUpdate={setUserSettings} onClearData={handleClearData} expenses={expenses} email={session.user.email} userId={session.user.id} onLogout={handleForcedLogout} />}
+        {activeTab === 'settings' && (
+          <SettingsView 
+            settings={userSettings} 
+            onUpdate={setUserSettings} 
+            onClearData={handleClearData} 
+            expenses={expenses} 
+            email={session.user.email} 
+            userId={session.user.id} 
+            onLogout={handleForcedLogout} 
+            onDeleteExpense={handleDeleteExpense}
+            onDeleteMultipleExpenses={async (ids) => {
+              try {
+                setIsSyncing(true);
+                await Promise.all(ids.map(id => db.deleteExpense(id)));
+                setAllExpenses(prev => prev.filter(e => !ids.includes(e.id)));
+                setSuccessToast("Spese dell'archivio eliminate!");
+                setTimeout(() => setSuccessToast(null), 3000);
+              } catch (err: any) {
+                alert(`Errore durante l'eliminazione: ${err.message}`);
+              } finally {
+                setIsSyncing(false);
+              }
+            }}
+          />
+        )}
         {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onEdit={ex => { setPrefill(ex); setShowForm(true); }} onDelete={handleDeleteExpense} currency={userSettings.currency} onSyncAll={handleSyncSubscriptions} />}
         {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={handleDeleteExpense} currency={userSettings.currency} wallets={userSettings.wallets} currentProfile={userSettings.currentProfile} />}
         
