@@ -192,17 +192,17 @@ const App: React.FC = () => {
           .single();
         
         if (error) {
-          console.error("[Security] Errore database:", error.message);
+          console.warn("[Security] Errore database:", error.message || error);
           setIsBanned(false);
           return false;
         }
 
-        console.log("[Security] Stato ricevuto dal DB:", data.status);
-        const banned = data.status === 'disabled';
+        console.log("[Security] Stato ricevuto dal DB:", data?.status);
+        const banned = data?.status === 'disabled';
         setIsBanned(banned);
         return banned;
-      } catch (e) {
-        console.error("[Security] Errore critico:", e);
+      } catch (e: any) {
+        console.warn("[Security] Errore critico:", e?.message || e);
         setIsBanned(false);
         return false;
       }
@@ -363,15 +363,15 @@ const App: React.FC = () => {
           }
           // Rimuovi i dati locali per non migrarli di nuovo
           localStorage.removeItem('mintflow_expenses');
-        } catch (migrationErr) {
-          console.error("Errore durante la migrazione:", migrationErr);
+        } catch (migrationErr: any) {
+          console.warn("Errore durante la migrazione:", migrationErr?.message || migrationErr);
         } finally {
           setIsSyncing(false);
         }
       }
     } catch (err: any) {
-      console.error("Errore caricamento:", err);
-      setSuccessToast("Errore caricamento dati!");
+      console.warn("Errore caricamento:", err?.message || err);
+      setSuccessToast("Errore di rete. Uso cache offline!");
       setTimeout(() => setSuccessToast(null), 3000);
       
       // FALLBACK: Carica dalla cache locale se il server fallisce
@@ -795,6 +795,39 @@ const App: React.FC = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    try {
+      const headers = ['Data', 'Descrizione', 'Importo', 'Categoria', 'Metodo di Pagamento', 'Profilo', 'Extra', 'Extra Tipo', 'Abbonamento'];
+      const rows = allExpenses.map(e => [
+        e.date,
+        `"${e.description.replace(/"/g, '""')}"`,
+        e.amount.toString(),
+        `"${e.category}"`,
+        `"${e.paymentMethod}"`,
+        e.profile || 'personal',
+        e.isExtra ? 'Si' : 'No',
+        e.extraType || '',
+        e.isSubscription ? 'Si' : 'No'
+      ]);
+      
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `esportazione_spese_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setSuccessToast("Esportazione completata!");
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (err) {
+      console.error("Errore export CSV", err);
+      alert("Errore esportazione CSV");
+    }
+  };
+
   if (isLoggingOut) {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center justify-center p-6">
@@ -897,6 +930,7 @@ const App: React.FC = () => {
             email={session.user.email} 
             userId={session.user.id} 
             onLogout={handleForcedLogout} 
+            onExport={handleExportCSV}
             onDeleteExpense={handleDeleteExpense}
             onDeleteMultipleExpenses={async (ids) => {
               try {

@@ -110,19 +110,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
          if (isFuture(parseDate(e.date))) return false;
 
          // Escludi ricariche e aggiustamenti tecnici
-         const isRefill = e.description.toLowerCase().includes('ricarica');
+         let isRefill = e.description.toLowerCase().includes('ricarica');
+         if (isRefill && e.paymentMethod === PaymentMethod.Revolut && e.category === 'Benzina') isRefill = false;
+         
          const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
+         
+         const isBenzinaAppQ8 = e.category === 'Benzina' && 
+           (e.paymentMethod === PaymentMethod.AppQ8 || e.paymentMethod === 'App Club Q8' as any);
 
-         return !isRefill && !isAdjustment;
+         return !isRefill && !isAdjustment && !isBenzinaAppQ8;
       })
       .reduce((sum, e) => sum + e.amount, 0);
   }, [currentMonthExpenses]);
 
-  const totalRicariche = useMemo(() => {
+  const totalBancomat = useMemo(() => {
     return currentMonthExpenses
       .filter(e => {
          if (isFuture(parseDate(e.date))) return false;
-         return e.description.toLowerCase().includes('ricarica');
+         return e.paymentMethod === PaymentMethod.Bancomat;
       })
       .reduce((sum, e) => sum + e.amount, 0);
   }, [currentMonthExpenses]);
@@ -143,14 +148,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const lastMonthDate = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1);
     
     const lastMonthExpenses = expenses.filter(e => isSameMonth(parseDate(e.date), lastMonthDate));
-    return lastMonthExpenses
-      .filter(e => 
-        !e.description.toLowerCase().includes('ricarica') && 
-        !e.description.toLowerCase().includes('aggiustamento') &&
-        !e.description.toLowerCase().includes('modifica') &&
-        !isFuture(parseDate(e.date))
-      )
-      .reduce((sum, e) => sum + e.amount, 0);
+      return lastMonthExpenses
+        .filter(e => {
+          let isRefill = e.description.toLowerCase().includes('ricarica');
+          if (isRefill && e.paymentMethod === PaymentMethod.Revolut && e.category === 'Benzina') isRefill = false;
+          
+          const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
+          const isBenzinaAppQ8 = e.category === 'Benzina' && 
+            (e.paymentMethod === PaymentMethod.AppQ8 || e.paymentMethod === 'App Club Q8' as any);
+            
+          return !isRefill && !isAdjustment && !isBenzinaAppQ8 && !isFuture(parseDate(e.date));
+        })
+        .reduce((sum, e) => sum + e.amount, 0);
   }, [expenses, currentMonthDate]);
 
   const diff = totalLastMonth > 0 ? ((totalCurrentMonth - totalLastMonth) / totalLastMonth) * 100 : 0;
@@ -197,10 +206,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // DATI GRAFICO CATEGORIE
   const categoryData = useMemo(() => {
-    const realSpending = currentMonthExpenses.filter(e => 
-      !e.description.toLowerCase().includes('aggiustamento') &&
-      !e.description.toLowerCase().includes('modifica')
-    );
+    const realSpending = currentMonthExpenses.filter(e => {
+      let isRefill = e.description.toLowerCase().includes('ricarica');
+      if (isRefill && e.paymentMethod === PaymentMethod.Revolut && e.category === 'Benzina') isRefill = false;
+      
+      const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
+      const isBenzinaAppQ8 = e.category === 'Benzina' && 
+        (e.paymentMethod === PaymentMethod.AppQ8 || e.paymentMethod === 'App Club Q8' as any);
+        
+      return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+    });
     
     const data: Record<string, number> = {};
     realSpending.forEach(e => {
@@ -227,10 +242,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           if (isFuture(d)) return false;
 
           // Stessa logica di "Calculated Total"
-          const isRefill = e.description.toLowerCase().includes('ricarica');
+          let isRefill = e.description.toLowerCase().includes('ricarica');
+          if (isRefill && e.paymentMethod === PaymentMethod.Revolut && e.category === 'Benzina') isRefill = false;
+          
           const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
+          const isBenzinaAppQ8 = e.category === 'Benzina' && 
+            (e.paymentMethod === PaymentMethod.AppQ8 || e.paymentMethod === 'App Club Q8' as any);
 
-          return !isRefill && !isAdjustment;
+          return !isRefill && !isAdjustment && !isBenzinaAppQ8;
       }).reduce((sum, e) => sum + e.amount, 0);
 
       // 2. Controllo se esiste un offset manuale per QUESTO mese specifico nelle impostazioni
@@ -377,7 +396,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
             </div>
             <div className="mt-1">
-              <p className="font-black text-xl dark:text-white">{formatValue(budget - totalRicariche)}</p>
+              <p className="font-black text-xl dark:text-white">{formatValue(budget - totalBancomat)}</p>
               <p className="text-[10px] text-gray-400 font-medium mt-0.5">Budget iniziale: {formatValue(budget)}</p>
             </div>
           </div>
