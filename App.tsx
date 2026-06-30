@@ -1,20 +1,34 @@
-
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { ExpenseList } from './components/ExpenseList';
-import { ExpenseForm } from './components/ExpenseForm';
-import { AiInsights } from './components/AiInsights';
-import { SettingsView } from './components/SettingsView';
-import { RicaricheView } from './components/RicaricheView';
-import { SubscriptionsView } from './components/SubscriptionsView';
-import { ExtraView } from './components/ExtraView';
-import { Auth } from './components/Auth';
-import { AdminDashboard } from './components/AdminDashboard';
-import { Expense, UserSettings, PaymentMethod, WalletConfig, CategoryConfig, ProfileType } from './types';
-import { Plus, Loader2, ShieldAlert, Mail, X, LogOut, ShieldCheck } from 'lucide-react';
-import { db, auth, supabase } from './services/supabase';
-import { format, isSameMonth } from 'date-fns';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Layout } from "./components/Layout";
+import { Dashboard } from "./components/Dashboard";
+import { ExpenseList } from "./components/ExpenseList";
+import { ExpenseForm } from "./components/ExpenseForm";
+import { AiInsights } from "./components/AiInsights";
+import { SettingsView } from "./components/SettingsView";
+import { RicaricheView } from "./components/RicaricheView";
+import { SubscriptionsView } from "./components/SubscriptionsView";
+import { ExtraView } from "./components/ExtraView";
+import { Auth } from "./components/Auth";
+import { AdminDashboard } from "./components/AdminDashboard";
+import {
+  Expense,
+  UserSettings,
+  PaymentMethod,
+  WalletConfig,
+  CategoryConfig,
+  ProfileType,
+} from "./types";
+import {
+  Plus,
+  Loader2,
+  ShieldAlert,
+  Mail,
+  X,
+  LogOut,
+  ShieldCheck,
+} from "lucide-react";
+import { db, auth, supabase } from "./services/supabase";
+import { format, isSameMonth } from "date-fns";
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -23,70 +37,102 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
-  
+
   // STATO SICUREZZA (null = in controllo, true = bannato, false = attivo)
   const [isBanned, setIsBanned] = useState<boolean | null>(null);
-  
+
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
-    const saved = localStorage.getItem('mintflow_user_settings');
+    const saved = localStorage.getItem("mintflow_user_settings");
     const defaultWallets: WalletConfig[] = [
-      { id: 'w0', name: 'Contanti', method: PaymentMethod.Contanti, icon: 'wallet' },
-      { id: 'w1', name: 'Prepagata Flash', method: PaymentMethod.Flash, icon: 'zap' },
-      { id: 'w2', name: 'Prepagata Revolut', method: PaymentMethod.Revolut, icon: 'credit-card' },
-      { id: 'w3', name: 'App Q8', method: PaymentMethod.AppQ8, icon: 'fuel' }
+      {
+        id: "w0",
+        name: "Contanti",
+        method: PaymentMethod.Contanti,
+        icon: "wallet",
+      },
+      {
+        id: "w1",
+        name: "Prepagata Flash",
+        method: PaymentMethod.Flash,
+        icon: "zap",
+      },
+      {
+        id: "w2",
+        name: "Prepagata Revolut",
+        method: PaymentMethod.Revolut,
+        icon: "credit-card",
+      },
+      { id: "w3", name: "App Q8", method: PaymentMethod.AppQ8, icon: "fuel" },
     ];
 
     const defaultCategories: CategoryConfig[] = [
-      { id: 'c1', name: 'Sigarette', color: '#ef4444' },
-      { id: 'c2', name: 'Benzina', color: '#f97316' },
-      { id: 'c3', name: 'Autostrada', color: '#eab308' },
-      { id: 'c4', name: 'Ricarica Chiavetta', color: '#84cc16' },
-      { id: 'c5', name: 'Svago', color: '#06b6d4' },
-      { id: 'c6', name: 'Salute', color: '#ec4899' },
-      { id: 'c7', name: 'Abbonamenti', isSubscriptionDefault: true, color: '#8b5cf6' },
-      { id: 'c8', name: 'Altro', color: '#64748b' }
+      { id: "c1", name: "Sigarette", color: "#ef4444" },
+      { id: "c2", name: "Benzina", color: "#f97316" },
+      { id: "c3", name: "Autostrada", color: "#eab308" },
+      { id: "c4", name: "Ricarica Chiavetta", color: "#84cc16" },
+      { id: "c5", name: "Svago", color: "#06b6d4" },
+      { id: "c6", name: "Salute", color: "#ec4899" },
+      {
+        id: "c7",
+        name: "Abbonamenti",
+        isSubscriptionDefault: true,
+        color: "#8b5cf6",
+      },
+      { id: "c8", name: "Altro", color: "#64748b" },
     ];
 
     const defaultSettings: UserSettings = {
-      name: 'Utente',
+      name: "Utente",
       monthlyBudget: 1000,
-      currency: '€',
+      currency: "€",
       isDarkMode: false,
       wallets: defaultWallets,
       categories: defaultCategories,
-      language: 'it',
-      currentProfile: 'personal',
+      language: "it",
+      currentProfile: "personal",
       monthlyOffset: 0,
-      lastOffsetDate: new Date().toISOString()
+      lastOffsetDate: new Date().toISOString(),
     };
 
     if (!saved) return defaultSettings;
     try {
       const parsed = JSON.parse(saved);
-      const merged = { ...defaultSettings, ...parsed, currentProfile: 'personal' };
+      const merged = {
+        ...defaultSettings,
+        ...parsed,
+        currentProfile: "personal",
+      };
       const now = new Date();
-      const lastOffsetDate = merged.lastOffsetDate ? new Date(merged.lastOffsetDate) : null;
+      const lastOffsetDate = merged.lastOffsetDate
+        ? new Date(merged.lastOffsetDate)
+        : null;
       if (!lastOffsetDate || !isSameMonth(lastOffsetDate, now)) {
         merged.monthlyOffset = 0;
         merged.lastOffsetDate = now.toISOString();
       }
       return merged;
-    } catch { return defaultSettings; }
+    } catch {
+      return defaultSettings;
+    }
   });
 
   useEffect(() => {
-    if (userSettings.isDarkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+    if (userSettings.isDarkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
   }, [userSettings.isDarkMode]);
 
   const expenses = useMemo(() => {
-    const profile = userSettings.currentProfile || 'personal';
-    return allExpenses.filter(e => (e.profile || 'personal') === profile && !e.isExtra);
+    const profile = userSettings.currentProfile || "personal";
+    return allExpenses.filter(
+      (e) => (e.profile || "personal") === profile && !e.isExtra,
+    );
   }, [allExpenses, userSettings.currentProfile]);
 
   const extraExpenses = useMemo(() => {
-    const profile = userSettings.currentProfile || 'personal';
-    return allExpenses.filter(e => (e.profile || 'personal') === profile && e.isExtra);
+    const profile = userSettings.currentProfile || "personal";
+    return allExpenses.filter(
+      (e) => (e.profile || "personal") === profile && e.isExtra,
+    );
   }, [allExpenses, userSettings.currentProfile]);
   const currentBudget = userSettings.monthlyBudget;
 
@@ -99,7 +145,7 @@ const App: React.FC = () => {
           const profile = await db.getProfile(session.user.id);
           if (profile?.settings) {
             console.log("Impostazioni cloud trovate:", profile.settings);
-            setUserSettings(prev => ({ ...prev, ...profile.settings }));
+            setUserSettings((prev) => ({ ...prev, ...profile.settings }));
           }
         } catch (err) {
           console.error("Errore caricamento settings dal profilo:", err);
@@ -115,49 +161,65 @@ const App: React.FC = () => {
 
     // Ascolta i cambiamenti delle impostazioni dagli altri dispositivi tramite la tabella profiles
     const channelName = `settings_sync_${session.user.id}`;
-    const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+    const existingChannel = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${channelName}`);
     if (existingChannel) {
       supabase.removeChannel(existingChannel);
     }
 
-    const settingsChannel = supabase.channel(channelName)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'profiles',
-        filter: `id=eq.${session.user.id}` 
-      }, (payload) => {
-        if (payload.new.settings) {
-          console.log("Rilevato cambio impostazioni (realtime profiles)!", payload.new.settings);
-          setUserSettings(prev => {
-            // Evita aggiornamenti se i dati sono identici (prevenzione loop)
-            const isSame = JSON.stringify(prev) === JSON.stringify(payload.new.settings);
-            if (isSame) return prev;
-            
-            setSuccessToast("Impostazioni sincronizzate!");
-            setTimeout(() => setSuccessToast(null), 2000);
-            return { ...prev, ...payload.new.settings };
-          });
-        }
-      })
+    const settingsChannel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          if (payload.new.settings) {
+            console.log(
+              "Rilevato cambio impostazioni (realtime profiles)!",
+              payload.new.settings,
+            );
+            setUserSettings((prev) => {
+              // Evita aggiornamenti se i dati sono identici (prevenzione loop)
+              const isSame =
+                JSON.stringify(prev) === JSON.stringify(payload.new.settings);
+              if (isSame) return prev;
+
+              setSuccessToast("Impostazioni sincronizzate!");
+              setTimeout(() => setSuccessToast(null), 2000);
+              return { ...prev, ...payload.new.settings };
+            });
+          }
+        },
+      )
       .subscribe();
 
-    return () => { supabase.removeChannel(settingsChannel); };
+    return () => {
+      supabase.removeChannel(settingsChannel);
+    };
   }, [session?.user?.id]);
 
   // Salva le impostazioni nel Cloud quando cambiano (con debounce)
   useEffect(() => {
-    localStorage.setItem('mintflow_user_settings', JSON.stringify(userSettings));
-    
+    localStorage.setItem(
+      "mintflow_user_settings",
+      JSON.stringify(userSettings),
+    );
+
     // Auto-registrazione budget nel mese corrente se manca
-    const currentMonthKey = format(new Date(), 'yyyy-MM');
+    const currentMonthKey = format(new Date(), "yyyy-MM");
     if (!userSettings.budgetHistory?.[currentMonthKey]) {
       const newHistory = { ...(userSettings.budgetHistory || {}) };
       newHistory[currentMonthKey] = {
         personal: userSettings.monthlyBudget,
-        joint: userSettings.jointBudget
+        joint: userSettings.jointBudget,
       };
-      setUserSettings(prev => ({ ...prev, budgetHistory: newHistory }));
+      setUserSettings((prev) => ({ ...prev, budgetHistory: newHistory }));
     }
 
     if (session?.user?.id) {
@@ -174,7 +236,15 @@ const App: React.FC = () => {
     }
   }, [userSettings, session]);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'ricariche' | 'ai' | 'settings' | 'subscriptions' | 'extra'>('dashboard');
+  const [activeTab, setActiveTab] = useState<
+    | "dashboard"
+    | "list"
+    | "ricariche"
+    | "ai"
+    | "settings"
+    | "subscriptions"
+    | "extra"
+  >("dashboard");
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
 
@@ -186,11 +256,11 @@ const App: React.FC = () => {
       console.log("[Security] Controllo stato per utente:", userId);
       try {
         const { data, error } = await supabase
-          .from('profiles')
-          .select('status')
-          .eq('id', userId)
+          .from("profiles")
+          .select("status")
+          .eq("id", userId)
           .single();
-        
+
         if (error) {
           console.warn("[Security] Errore database:", error.message || error);
           setIsBanned(false);
@@ -198,7 +268,7 @@ const App: React.FC = () => {
         }
 
         console.log("[Security] Stato ricevuto dal DB:", data?.status);
-        const banned = data?.status === 'disabled';
+        const banned = data?.status === "disabled";
         setIsBanned(banned);
         return banned;
       } catch (e: any) {
@@ -212,45 +282,70 @@ const App: React.FC = () => {
       // Timeout di sicurezza per evitare caricamento infinito
       const timeout = setTimeout(() => {
         if (isInitialLoading) {
-          console.warn("[Security] Inizializzazione in timeout, forzo avvio...");
+          console.warn(
+            "[Security] Inizializzazione in timeout, forzo avvio...",
+          );
           setIsInitialLoading(false);
           setIsBanned(false);
         }
       }, 8000);
 
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      console.log("[Security] Sessione iniziale recuperata:", currentSession ? "Presente" : "Null");
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+      console.log(
+        "[Security] Sessione iniziale recuperata:",
+        currentSession ? "Presente" : "Null",
+      );
       setSession(currentSession);
-      
+
       if (currentSession?.user) {
         // ...
         const banned = await checkStatus(currentSession.user.id);
-        
+
         if (!banned) {
           const metadata = currentSession.user.user_metadata;
-          const displayName = metadata.full_name || metadata.display_name || metadata.name || currentSession.user.email?.split('@')[0] || 'Utente';
-          setUserSettings(prev => ({ ...prev, name: displayName }));
-          await db.upsertProfile(currentSession.user.id, currentSession.user.email || '', displayName);
+          const displayName =
+            metadata.full_name ||
+            metadata.display_name ||
+            metadata.name ||
+            currentSession.user.email?.split("@")[0] ||
+            "Utente";
+          setUserSettings((prev) => ({ ...prev, name: displayName }));
+          await db.upsertProfile(
+            currentSession.user.id,
+            currentSession.user.email || "",
+            displayName,
+          );
         }
 
         const channelName = `security-${currentSession.user.id}`;
         // Rimuovi eventuali canali esistenti con lo stesso nome per evitare l'errore "after subscribe"
-        const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+        const existingChannel = supabase
+          .getChannels()
+          .find((c) => c.topic === `realtime:${channelName}`);
         if (existingChannel) {
           await supabase.removeChannel(existingChannel);
         }
 
         channel = supabase
           .channel(channelName)
-          .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'profiles',
-            filter: `id=eq.${currentSession.user.id}` 
-          }, (payload) => {
-            console.log("[Security] Realtime change rilevato:", payload.new.status);
-            setIsBanned(payload.new.status === 'disabled');
-          })
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "profiles",
+              filter: `id=eq.${currentSession.user.id}`,
+            },
+            (payload) => {
+              console.log(
+                "[Security] Realtime change rilevato:",
+                payload.new.status,
+              );
+              setIsBanned(payload.new.status === "disabled");
+            },
+          )
           .subscribe();
       } else {
         setIsBanned(false);
@@ -261,16 +356,31 @@ const App: React.FC = () => {
 
     initSecurity();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log("[Auth] Evento AuthChange:", event, currentSession ? "Sessione presente" : "Sessione nulla");
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log(
+        "[Auth] Evento AuthChange:",
+        event,
+        currentSession ? "Sessione presente" : "Sessione nulla",
+      );
       setSession(currentSession);
       if (currentSession?.user) {
         // Ad ogni cambio sessione, riverifica
         const banned = await checkStatus(currentSession.user.id);
-        if (!banned && event === 'SIGNED_IN') {
-           const metadata = currentSession.user.user_metadata;
-           const displayName = metadata.full_name || metadata.display_name || metadata.name || currentSession.user.email?.split('@')[0] || 'Utente';
-           await db.upsertProfile(currentSession.user.id, currentSession.user.email || '', displayName);
+        if (!banned && event === "SIGNED_IN") {
+          const metadata = currentSession.user.user_metadata;
+          const displayName =
+            metadata.full_name ||
+            metadata.display_name ||
+            metadata.name ||
+            currentSession.user.email?.split("@")[0] ||
+            "Utente";
+          await db.upsertProfile(
+            currentSession.user.id,
+            currentSession.user.email || "",
+            displayName,
+          );
         }
       } else {
         setIsBanned(false);
@@ -284,145 +394,178 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const fetchExpenses = useCallback(async (silent = false) => {
-    if (!session?.user?.id || isBanned) return;
-    try {
-      if (!silent) setIsLoading(true);
-      
-      // 1. Prova a caricare dal server con timeout (aumentato a 60s)
-      const fetchPromise = db.getExpenses(session.user.id);
-      const timeoutPromise = new Promise<Expense[]>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout caricamento dati (60s)")), 60000)
-      );
-      
-      let data = await Promise.race([fetchPromise, timeoutPromise]);
-      
-      // Sincronizza spese locali non salvate (offline sync)
-      const cachedDataStr = localStorage.getItem('mintflow_cache_v2');
-      if (cachedDataStr) {
-        try {
-          const cachedData: Expense[] = JSON.parse(cachedDataStr);
-          const localUnsynced = cachedData.filter(e => e._isLocal);
-          
-          if (localUnsynced.length > 0) {
-            let syncCount = 0;
-            for (const exp of localUnsynced) {
-              try {
-                const { id, _isLocal, ...expenseData } = exp;
-                if (id.startsWith('temp-')) {
-                  // Nuova spesa
-                  await db.addExpense(expenseData, session.user.id);
-                } else {
-                  // Modifica spesa esistente
-                  await db.updateExpense(id, expenseData);
+  const fetchExpenses = useCallback(
+    async (silent = false) => {
+      if (!session?.user?.id || isBanned) return;
+      try {
+        if (!silent) setIsLoading(true);
+
+        // 1. Prova a caricare dal server con timeout (aumentato a 60s)
+        const fetchPromise = db.getExpenses(session.user.id);
+        const timeoutPromise = new Promise<Expense[]>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Timeout caricamento dati (60s)")),
+            60000,
+          ),
+        );
+
+        let data = await Promise.race([fetchPromise, timeoutPromise]);
+
+        // Sincronizza spese locali non salvate (offline sync)
+        const cachedDataStr = localStorage.getItem("mintflow_cache_v2");
+        if (cachedDataStr) {
+          try {
+            const cachedData: Expense[] = JSON.parse(cachedDataStr);
+            const localUnsynced = cachedData.filter((e) => e._isLocal);
+
+            if (localUnsynced.length > 0) {
+              let syncCount = 0;
+              for (const exp of localUnsynced) {
+                try {
+                  const { id, _isLocal, ...expenseData } = exp;
+                  if (id.startsWith("temp-")) {
+                    // Nuova spesa
+                    await db.addExpense(expenseData, session.user.id);
+                  } else {
+                    // Modifica spesa esistente
+                    await db.updateExpense(id, expenseData);
+                  }
+                  syncCount++;
+                } catch (e) {
+                  console.error("Errore sync spesa locale:", e);
                 }
-                syncCount++;
-              } catch (e) {
-                console.error("Errore sync spesa locale:", e);
+              }
+              if (syncCount > 0) {
+                // Ricarica dal server se abbiamo sincronizzato qualcosa
+                data = await db.getExpenses(session.user.id);
+                setSuccessToast(`Sincronizzate ${syncCount} spese offline!`);
+                setTimeout(() => setSuccessToast(null), 3000);
               }
             }
-            if (syncCount > 0) {
-              // Ricarica dal server se abbiamo sincronizzato qualcosa
-              data = await db.getExpenses(session.user.id);
-              setSuccessToast(`Sincronizzate ${syncCount} spese offline!`);
-              setTimeout(() => setSuccessToast(null), 3000);
-            }
+          } catch (e) {
+            console.error("Errore lettura cache per sync:", e);
           }
-        } catch (e) {
-          console.error("Errore lettura cache per sync:", e);
         }
-      }
 
-      // 2. Salva nella cache locale aggiornata
-      localStorage.setItem('mintflow_cache_v2', JSON.stringify(data));
-      
-      setAllExpenses(data);
-      
-      // Controlla se ci sono dati locali da migrare (vecchia versione)
-      const localData = localStorage.getItem('mintflow_expenses');
-      if (localData) {
-        try {
-          const expensesToMigrate: Expense[] = JSON.parse(localData);
-          if (expensesToMigrate.length > 0) {
-            setIsSyncing(true);
-            setSuccessToast(`Recupero di ${expensesToMigrate.length} vecchie spese in corso...`);
-            
-            // Carica le spese una ad una
-            for (const exp of expensesToMigrate.reverse()) {
-              const { id, ...expenseData } = exp;
-              await db.addExpense({ ...expenseData, profile: 'personal' }, session.user.id);
+        // 2. Salva nella cache locale aggiornata
+        localStorage.setItem("mintflow_cache_v2", JSON.stringify(data));
+
+        setAllExpenses(data);
+
+        // Controlla se ci sono dati locali da migrare (vecchia versione)
+        const localData = localStorage.getItem("mintflow_expenses");
+        if (localData) {
+          try {
+            const expensesToMigrate: Expense[] = JSON.parse(localData);
+            if (expensesToMigrate.length > 0) {
+              setIsSyncing(true);
+              setSuccessToast(
+                `Recupero di ${expensesToMigrate.length} vecchie spese in corso...`,
+              );
+
+              // Carica le spese una ad una
+              for (const exp of expensesToMigrate.reverse()) {
+                const { id, ...expenseData } = exp;
+                await db.addExpense(
+                  { ...expenseData, profile: "personal" },
+                  session.user.id,
+                );
+              }
+
+              // Ricarica le spese aggiornate dal server
+              const updatedData = await db.getExpenses(session.user.id);
+              setAllExpenses(updatedData);
+              localStorage.setItem(
+                "mintflow_cache_v2",
+                JSON.stringify(updatedData),
+              );
+
+              setSuccessToast(
+                "Dati recuperati e salvati in cloud con successo!",
+              );
+              setTimeout(() => setSuccessToast(null), 4000);
             }
-            
-            // Ricarica le spese aggiornate dal server
-            const updatedData = await db.getExpenses(session.user.id);
-            setAllExpenses(updatedData);
-            localStorage.setItem('mintflow_cache_v2', JSON.stringify(updatedData));
-            
-            setSuccessToast("Dati recuperati e salvati in cloud con successo!");
-            setTimeout(() => setSuccessToast(null), 4000);
+            // Rimuovi i dati locali per non migrarli di nuovo
+            localStorage.removeItem("mintflow_expenses");
+          } catch (migrationErr: any) {
+            console.warn(
+              "Errore durante la migrazione:",
+              migrationErr?.message || migrationErr,
+            );
+          } finally {
+            setIsSyncing(false);
           }
-          // Rimuovi i dati locali per non migrarli di nuovo
-          localStorage.removeItem('mintflow_expenses');
-        } catch (migrationErr: any) {
-          console.warn("Errore durante la migrazione:", migrationErr?.message || migrationErr);
-        } finally {
-          setIsSyncing(false);
         }
-      }
-    } catch (err: any) {
-      console.warn("Errore caricamento:", err?.message || err);
-      setSuccessToast("Errore di rete. Uso cache offline!");
-      setTimeout(() => setSuccessToast(null), 3000);
-      
-      // FALLBACK: Carica dalla cache locale se il server fallisce
-      const cachedData = localStorage.getItem('mintflow_cache_v2');
-      if (cachedData) {
-        try {
-          const parsedCache = JSON.parse(cachedData);
-          setAllExpenses(parsedCache);
-          setSuccessToast("Modalità Offline: Dati dalla cache");
-          if (!silent) alert("Impossibile connettersi al server. Mostro i dati salvati localmente.");
-        } catch (e) {
-          console.error("Cache corrotta");
-        }
-      } else {
-        if (!silent) alert(`Impossibile caricare le spese: ${err.message || "Errore di connessione"}`);
-      }
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
-  }, [session, isBanned]);
+      } catch (err: any) {
+        console.warn("Errore caricamento:", err?.message || err);
+        setSuccessToast("Errore di rete. Uso cache offline!");
+        setTimeout(() => setSuccessToast(null), 3000);
 
-  useEffect(() => { 
+        // FALLBACK: Carica dalla cache locale se il server fallisce
+        const cachedData = localStorage.getItem("mintflow_cache_v2");
+        if (cachedData) {
+          try {
+            const parsedCache = JSON.parse(cachedData);
+            setAllExpenses(parsedCache);
+            setSuccessToast("Modalità Offline: Dati dalla cache");
+            if (!silent)
+              alert(
+                "Impossibile connettersi al server. Mostro i dati salvati localmente.",
+              );
+          } catch (e) {
+            console.error("Cache corrotta");
+          }
+        } else {
+          if (!silent)
+            alert(
+              `Impossibile caricare le spese: ${err.message || "Errore di connessione"}`,
+            );
+        }
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [session, isBanned],
+  );
+
+  useEffect(() => {
     if (session?.user?.id) {
       // Carica subito dalla cache per velocità, poi aggiorna dal server
-      const cachedData = localStorage.getItem('mintflow_cache_v2');
+      const cachedData = localStorage.getItem("mintflow_cache_v2");
       if (cachedData) {
         try {
           setAllExpenses(JSON.parse(cachedData));
         } catch (e) {}
       }
 
-      fetchExpenses(); 
-      
+      fetchExpenses();
+
       // Sottoscrizione realtime per mantenere sincronizzati i dispositivi
       const channelName = `public:expenses:user_id=eq.${session.user.id}`;
-      const existingChannel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+      const existingChannel = supabase
+        .getChannels()
+        .find((c) => c.topic === `realtime:${channelName}`);
       if (existingChannel) {
         supabase.removeChannel(existingChannel);
       }
 
       const expensesChannel = supabase
         .channel(channelName)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'expenses',
-          filter: `user_id=eq.${session.user.id}`
-        }, () => {
-          console.log("Cambiamento rilevato nel database, aggiorno le spese...");
-          fetchExpenses(true);
-        })
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "expenses",
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => {
+            console.log(
+              "Cambiamento rilevato nel database, aggiorno le spese...",
+            );
+            fetchExpenses(true);
+          },
+        )
         .subscribe();
 
       return () => {
@@ -434,30 +577,52 @@ const App: React.FC = () => {
   // --- INTEGRAZIONE IOS APP NATIVA ---
   useEffect(() => {
     const sendDataToIOS = () => {
-      if (session?.user?.id && !isInitialLoading && !isLoading && activeTab === 'dashboard') {
+      if (
+        session?.user?.id &&
+        !isInitialLoading &&
+        !isLoading &&
+        activeTab === "dashboard"
+      ) {
         try {
           const currentMonthDate = new Date();
-          const currentMonthExpenses = expenses.filter(e => {
-            const [y, m, d] = e.date.split('-').map(Number);
+          const currentMonthExpenses = expenses.filter((e) => {
+            const [y, m, d] = e.date.split("-").map(Number);
             const expenseDate = new Date(y, m - 1, d);
             return isSameMonth(expenseDate, currentMonthDate);
           });
 
           const calculatedTotal = currentMonthExpenses
-            .filter(e => {
-               const [y, m, d] = e.date.split('-').map(Number);
-               const expenseDate = new Date(y, m - 1, d);
-               if (expenseDate > new Date()) return false;
+            .filter((e) => {
+              const [y, m, d] = e.date.split("-").map(Number);
+              const expenseDate = new Date(y, m - 1, d);
+              if (expenseDate > new Date()) return false;
 
-               const isRefill = e.description.toLowerCase().includes('ricarica');
-               const isAdjustment = e.description.toLowerCase().includes('aggiustamento') || e.description.toLowerCase().includes('modifica');
-               return !isRefill && !isAdjustment;
+              let isRefill = e.description.toLowerCase().includes("ricarica");
+              if (
+                isRefill &&
+                e.paymentMethod === PaymentMethod.Revolut &&
+                e.category === "Benzina"
+              )
+                isRefill = false;
+
+              const isAdjustment =
+                e.description.toLowerCase().includes("aggiustamento") ||
+                e.description.toLowerCase().includes("modifica");
+
+              const isBenzinaAppQ8 =
+                e.category === "Benzina" &&
+                (e.paymentMethod === PaymentMethod.AppQ8 ||
+                  e.paymentMethod === ("App Club Q8" as any));
+
+              return !isRefill && !isAdjustment && !isBenzinaAppQ8;
             })
             .reduce((sum, e) => sum + e.amount, 0);
 
           let validOffset = 0;
           if (userSettings?.monthlyOffset) {
-            const lastDate = userSettings.lastOffsetDate ? new Date(userSettings.lastOffsetDate) : null;
+            const lastDate = userSettings.lastOffsetDate
+              ? new Date(userSettings.lastOffsetDate)
+              : null;
             if (lastDate && isSameMonth(lastDate, currentMonthDate)) {
               validOffset = userSettings.monthlyOffset;
             }
@@ -466,59 +631,84 @@ const App: React.FC = () => {
           const totalCurrentMonth = Math.max(0, calculatedTotal + validOffset);
           const formattedSpeso = totalCurrentMonth.toFixed(2);
 
-          const balances = userSettings.wallets.map(w => {
+          const balances = userSettings.wallets.map((w) => {
             const name = w.name.toLowerCase();
-            
+
             const totalIn = allExpenses
-              .filter(e => {
+              .filter((e) => {
                 const desc = e.description.toLowerCase();
-                const isInflow = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
-                const isExtraReceived = e.isExtra && e.extraType === 'received' && e.paymentMethod === w.method;
-                
-                return (isInflow && e.paymentMethod !== w.method) || isExtraReceived;
+                const isInflow =
+                  desc.includes(`ricarica ${name}`) ||
+                  desc.includes(`aggiustamento ${name}`) ||
+                  desc.includes(`modifica saldo ${name}`) ||
+                  desc.includes(`modifica ${name}`);
+                const isExtraReceived =
+                  e.isExtra &&
+                  e.extraType === "received" &&
+                  e.paymentMethod === w.method;
+
+                return (
+                  (isInflow && e.paymentMethod !== w.method) || isExtraReceived
+                );
               })
               .reduce((sum, e) => sum + e.amount, 0);
-            
+
             const totalOut = allExpenses
-              .filter(e => {
+              .filter((e) => {
                 const desc = e.description.toLowerCase();
                 const isWalletMethod = e.paymentMethod === w.method;
-                const isInflowOfThisWallet = desc.includes(`ricarica ${name}`) || desc.includes(`aggiustamento ${name}`) || desc.includes(`modifica saldo ${name}`) || desc.includes(`modifica ${name}`);
-                const isExtraReceived = e.isExtra && e.extraType === 'received';
-                
-                const [y, m, d] = e.date.split('-').map(Number);
+                const isInflowOfThisWallet =
+                  desc.includes(`ricarica ${name}`) ||
+                  desc.includes(`aggiustamento ${name}`) ||
+                  desc.includes(`modifica saldo ${name}`) ||
+                  desc.includes(`modifica ${name}`);
+                const isExtraReceived = e.isExtra && e.extraType === "received";
+
+                const [y, m, d] = e.date.split("-").map(Number);
                 const expenseDate = new Date(y, m - 1, d);
                 const isFutureDate = expenseDate > new Date();
-                
-                return isWalletMethod && !isInflowOfThisWallet && !isExtraReceived && !isFutureDate;
+
+                return (
+                  isWalletMethod &&
+                  !isInflowOfThisWallet &&
+                  !isExtraReceived &&
+                  !isFutureDate
+                );
               })
               .reduce((sum, e) => sum + e.amount, 0);
-            
+
             const calculatedBalance = totalIn - totalOut;
             return {
               nome: w.name,
-              saldo: Math.max(0, calculatedBalance + (w.balanceOffset || 0))
+              saldo: Math.max(0, calculatedBalance + (w.balanceOffset || 0)),
             };
           });
 
           const recentTransactions = [...allExpenses]
             .sort((a, b) => {
-              const [yA, mA, dA] = a.date.split('-').map(Number);
-              const [yB, mB, dB] = b.date.split('-').map(Number);
-              return new Date(yB, mB - 1, dB).getTime() - new Date(yA, mA - 1, dA).getTime();
+              const [yA, mA, dA] = a.date.split("-").map(Number);
+              const [yB, mB, dB] = b.date.split("-").map(Number);
+              return (
+                new Date(yB, mB - 1, dB).getTime() -
+                new Date(yA, mA - 1, dA).getTime()
+              );
             })
             .slice(0, 10)
-            .map(e => ({
+            .map((e) => ({
               titolo: e.description,
               importo: e.amount,
-              isIncome: !!(e.isExtra && e.extraType === 'received')
+              isIncome: !!(e.isExtra && e.extraType === "received"),
             }));
 
-          if ((window as any).webkit && (window as any).webkit.messageHandlers && (window as any).webkit.messageHandlers.mintflowBridge) {
+          if (
+            (window as any).webkit &&
+            (window as any).webkit.messageHandlers &&
+            (window as any).webkit.messageHandlers.mintflowBridge
+          ) {
             (window as any).webkit.messageHandlers.mintflowBridge.postMessage({
-              "spesoQuestoMese": formattedSpeso,
-              "portafogli": balances,
-              "movimenti": recentTransactions
+              spesoQuestoMese: formattedSpeso,
+              portafogli: balances,
+              movimenti: recentTransactions,
             });
           }
         } catch (error) {
@@ -532,24 +722,32 @@ const App: React.FC = () => {
 
     // Invia i dati ogni volta che l'app torna in primo piano (es. riapertura app iOS)
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         sendDataToIOS();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [session, isInitialLoading, isLoading, allExpenses, expenses, userSettings, activeTab]);
+  }, [
+    session,
+    isInitialLoading,
+    isLoading,
+    allExpenses,
+    expenses,
+    userSettings,
+    activeTab,
+  ]);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleForcedLogout = async () => {
     console.log("[Logout] Logout forzato avviato...");
     setIsLoggingOut(true);
-    
+
     // 1. Pulizia immediata della memoria locale
     try {
       console.log("[Logout] Inizio pulizia storage...");
@@ -557,28 +755,34 @@ const App: React.FC = () => {
       sessionStorage.clear();
       console.log("[Logout] Storage locale pulito con successo.");
     } catch (e: any) {
-      console.error("[Logout] Errore durante la pulizia dello storage:", e.message);
+      console.error(
+        "[Logout] Errore durante la pulizia dello storage:",
+        e.message,
+      );
     }
 
     try {
       // 2. Tentativo di logout tecnico con timeout
       console.log("[Logout] Chiamata a supabase.auth.signOut()...");
       const signOutPromise = supabase.auth.signOut();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout signOut")), 3000)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout signOut")), 3000),
       );
-      
+
       const result = await Promise.race([signOutPromise, timeoutPromise]);
       console.log("[Logout] Risultato signOut:", result);
       console.log("[Logout] Logout tecnico completato.");
     } catch (err: any) {
-      console.warn("[Logout] Logout tecnico fallito o in timeout, procedo comunque col reload:", err.message);
+      console.warn(
+        "[Logout] Logout tecnico fallito o in timeout, procedo comunque col reload:",
+        err.message,
+      );
     }
-    
+
     // 3. Reindirizzamento forzato alla home con cache busting
     const targetUrl = window.location.origin + "?logout=" + Date.now();
     console.log("[Logout] Reindirizzamento finale a:", targetUrl);
-    
+
     // Piccola pausa per permettere ai log di essere inviati e all'utente di vedere l'overlay
     setTimeout(() => {
       window.location.href = targetUrl;
@@ -586,8 +790,8 @@ const App: React.FC = () => {
   };
 
   const handleUpdateWallets = async (newWallets: WalletConfig[]) => {
-    setUserSettings(prev => ({ ...prev, wallets: newWallets }));
-    
+    setUserSettings((prev) => ({ ...prev, wallets: newWallets }));
+
     // Immediate sync to cloud
     if (session?.user?.id) {
       try {
@@ -601,7 +805,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveExpense = async (expenseData: Omit<Expense, 'id'>) => {
+  const handleSaveExpense = async (expenseData: Omit<Expense, "id">) => {
     if (!session?.user?.id) {
       setSuccessToast("Errore: Non sei connesso!");
       setTimeout(() => setSuccessToast(null), 3000);
@@ -609,61 +813,74 @@ const App: React.FC = () => {
     }
 
     // 1. UI Optimistic Update
-    const tempId = 'temp-' + Date.now();
+    const tempId = "temp-" + Date.now();
     const optimisticExpense: Expense = {
       id: prefill?.id || tempId,
       ...expenseData,
       profile: userSettings.currentProfile,
-      _isLocal: true // Segna come locale finché non confermato
+      _isLocal: true, // Segna come locale finché non confermato
     };
 
     // Aggiorna subito la UI e la CACHE
-    setAllExpenses(prev => {
-      const newState = prefill?.id 
-        ? prev.map(e => e.id === optimisticExpense.id ? optimisticExpense : e) 
+    setAllExpenses((prev) => {
+      const newState = prefill?.id
+        ? prev.map((e) =>
+            e.id === optimisticExpense.id ? optimisticExpense : e,
+          )
         : [optimisticExpense, ...prev];
-      localStorage.setItem('mintflow_cache_v2', JSON.stringify(newState));
+      localStorage.setItem("mintflow_cache_v2", JSON.stringify(newState));
       return newState;
     });
-    
+
     setShowForm(false);
     setPrefill(null);
     setSuccessToast("Salvataggio in corso...");
 
     // 2. Background Sync con Timeout
     try {
-      const dataToSave = { ...expenseData, profile: userSettings.currentProfile };
-      
-      const savePromise = prefill?.id 
+      const dataToSave = {
+        ...expenseData,
+        profile: userSettings.currentProfile,
+      };
+
+      const savePromise = prefill?.id
         ? db.updateExpense(prefill.id, dataToSave)
         : db.addExpense(dataToSave, session.user.id);
 
       // Timeout di 60 secondi per evitare blocchi (aumentato per connessioni lente)
-      const timeoutPromise = new Promise<Expense>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout: Il server non risponde in tempo (60s)")), 60000)
+      const timeoutPromise = new Promise<Expense>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(new Error("Timeout: Il server non risponde in tempo (60s)")),
+          60000,
+        ),
       );
 
       const saved = await Promise.race([savePromise, timeoutPromise]);
-      
+
       // Sostituisci l'ID temporaneo con quello reale se era un nuovo inserimento
-      setAllExpenses(prev => {
-        const newState = prev.map(e => e.id === (prefill?.id || tempId) ? { ...saved, _isLocal: false } : e);
-        localStorage.setItem('mintflow_cache_v2', JSON.stringify(newState));
+      setAllExpenses((prev) => {
+        const newState = prev.map((e) =>
+          e.id === (prefill?.id || tempId) ? { ...saved, _isLocal: false } : e,
+        );
+        localStorage.setItem("mintflow_cache_v2", JSON.stringify(newState));
         return newState;
       });
-      
+
       setSuccessToast("Salvato!");
       setTimeout(() => setSuccessToast(null), 2000);
-    } catch (err: any) { 
+    } catch (err: any) {
       // Rollback in caso di errore
       console.error("Errore salvataggio:", err);
       setSuccessToast("Errore salvataggio!");
       setTimeout(() => setSuccessToast(null), 3000);
-      
+
       // Mostra un messaggio più dettagliato
       const errorMsg = err.message || "Errore sconosciuto";
-      alert(`Impossibile salvare la spesa sul server: ${errorMsg}. La spesa rimarrà salvata localmente.`);
-      
+      alert(
+        `Impossibile salvare la spesa sul server: ${errorMsg}. La spesa rimarrà salvata localmente.`,
+      );
+
       // NON RIMUOVERE LA SPESA, lasciala come locale (_isLocal=true)
       // Così l'utente non perde i dati.
       // In futuro potremmo aggiungere un meccanismo di retry.
@@ -674,7 +891,7 @@ const App: React.FC = () => {
     try {
       setIsSyncing(true);
       await db.deleteExpense(id);
-      setAllExpenses(prev => prev.filter(e => e.id !== id));
+      setAllExpenses((prev) => prev.filter((e) => e.id !== id));
       setSuccessToast("Spesa eliminata!");
       setTimeout(() => setSuccessToast(null), 3000);
     } catch (err: any) {
@@ -686,41 +903,48 @@ const App: React.FC = () => {
 
   const handleSyncSubscriptions = async () => {
     if (!session?.user?.id || allExpenses.length === 0) return;
-    
+
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1-indexed
-    const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
 
     // 1. Trova TUTTE le spese che sono segnate come abbonamento (indipendentemente dalla categoria)
     //    Questo è fondamentale per trovare la catena di abbonamenti attiva.
-    const allSubs = allExpenses.filter(e => e.isSubscription);
-    
+    const allSubs = allExpenses.filter((e) => e.isSubscription);
+
     // 2. Trova gli abbonamenti che sono già presenti nel mese corrente
-    const currentMonthSubs = allSubs.filter(e => {
-      const [y, m] = e.date.split('-').map(Number);
-      return `${y}-${String(m).padStart(2, '0')}` === currentMonthStr;
+    const currentMonthSubs = allSubs.filter((e) => {
+      const [y, m] = e.date.split("-").map(Number);
+      return `${y}-${String(m).padStart(2, "0")}` === currentMonthStr;
     });
 
     // 3. Trova gli abbonamenti dei mesi passati che NON hanno ancora un corrispettivo nel mese corrente
-    const subsToDuplicate = allSubs.filter(oldSub => {
-      const [y, m] = oldSub.date.split('-').map(Number);
-      const expenseMonthStr = `${y}-${String(m).padStart(2, '0')}`;
-      
+    const subsToDuplicate = allSubs.filter((oldSub) => {
+      const [y, m] = oldSub.date.split("-").map(Number);
+      const expenseMonthStr = `${y}-${String(m).padStart(2, "0")}`;
+
       // Se è già del mese corrente, ignoralo
       if (expenseMonthStr === currentMonthStr) return false;
-      
+
       // Controlla se esiste già un abbonamento con la stessa descrizione nel mese corrente
       const alreadyExistsInCurrentMonth = currentMonthSubs.some(
-        newSub => newSub.description.toLowerCase().trim() === oldSub.description.toLowerCase().trim()
+        (newSub) =>
+          newSub.description.toLowerCase().trim() ===
+          oldSub.description.toLowerCase().trim(),
       );
-      
+
       return !alreadyExistsInCurrentMonth;
     });
 
     // 4. Filtra per mantenere solo l'istanza più recente di ogni abbonamento da duplicare
     const uniqueSubsToDuplicate = Array.from(
-      new Map(subsToDuplicate.map(sub => [sub.description.toLowerCase().trim(), sub])).values()
+      new Map(
+        subsToDuplicate.map((sub) => [
+          sub.description.toLowerCase().trim(),
+          sub,
+        ]),
+      ).values(),
     );
 
     if (uniqueSubsToDuplicate.length === 0) {
@@ -732,12 +956,16 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       const operations = uniqueSubsToDuplicate.map(async (sub: Expense) => {
-        const [,, dStr] = sub.date.split('-');
+        const [, , dStr] = sub.date.split("-");
         const d = parseInt(dStr, 10);
-        const lastDayOfCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
+        const lastDayOfCurrentMonth = new Date(
+          currentYear,
+          currentMonth,
+          0,
+        ).getDate();
         const safeDay = Math.min(d, lastDayOfCurrentMonth);
-        const newDate = `${currentMonthStr}-${String(safeDay).padStart(2, '0')}`;
-        
+        const newDate = `${currentMonthStr}-${String(safeDay).padStart(2, "0")}`;
+
         const newExpenseData = {
           description: sub.description,
           amount: sub.amount,
@@ -747,9 +975,9 @@ const App: React.FC = () => {
           isSubscription: true, // Il nuovo è un abbonamento attivo
           profile: sub.profile,
           isExtra: sub.isExtra,
-          extraType: sub.extraType
+          extraType: sub.extraType,
         };
-        
+
         // Aggiungi la nuova spesa per il mese corrente
         const newExpense = await db.addExpense(newExpenseData, session.user.id);
 
@@ -760,26 +988,28 @@ const App: React.FC = () => {
       });
 
       const results = await Promise.all(operations);
-      
+
       // Aggiorna lo stato locale: aggiungi i nuovi e aggiorna i vecchi
-      setAllExpenses(prev => {
+      setAllExpenses((prev) => {
         let updated = [...prev];
-        
+
         results.forEach(({ newExpense, oldId }) => {
           // Aggiungi nuovo
           updated = [newExpense, ...updated];
-          
+
           // Aggiorna vecchio (isSubscription: false)
-          const oldIndex = updated.findIndex(e => e.id === oldId);
+          const oldIndex = updated.findIndex((e) => e.id === oldId);
           if (oldIndex !== -1) {
             updated[oldIndex] = { ...updated[oldIndex], isSubscription: false };
           }
         });
-        
+
         return updated;
       });
 
-      setSuccessToast(`${results.length} abbonamenti rinnovati per il mese corrente!`);
+      setSuccessToast(
+        `${results.length} abbonamenti rinnovati per il mese corrente!`,
+      );
       setTimeout(() => setSuccessToast(null), 3000);
     } catch (err: any) {
       alert(`Errore durante l'aggiornamento: ${err.message}`);
@@ -789,37 +1019,57 @@ const App: React.FC = () => {
   };
 
   const handleClearData = () => {
-    if (window.confirm("Vuoi resettare tutte le impostazioni locali? I dati sul server rimarranno intatti.")) {
-      localStorage.removeItem('mintflow_user_settings');
+    if (
+      window.confirm(
+        "Vuoi resettare tutte le impostazioni locali? I dati sul server rimarranno intatti.",
+      )
+    ) {
+      localStorage.removeItem("mintflow_user_settings");
       window.location.reload();
     }
   };
 
   const handleExportCSV = () => {
     try {
-      const headers = ['Data', 'Descrizione', 'Importo', 'Categoria', 'Metodo di Pagamento', 'Profilo', 'Extra', 'Extra Tipo', 'Abbonamento'];
-      const rows = allExpenses.map(e => [
+      const headers = [
+        "Data",
+        "Descrizione",
+        "Importo",
+        "Categoria",
+        "Metodo di Pagamento",
+        "Profilo",
+        "Extra",
+        "Extra Tipo",
+        "Abbonamento",
+      ];
+      const rows = allExpenses.map((e) => [
         e.date,
         `"${e.description.replace(/"/g, '""')}"`,
         e.amount.toString(),
         `"${e.category}"`,
         `"${e.paymentMethod}"`,
-        e.profile || 'personal',
-        e.isExtra ? 'Si' : 'No',
-        e.extraType || '',
-        e.isSubscription ? 'Si' : 'No'
+        e.profile || "personal",
+        e.isExtra ? "Si" : "No",
+        e.extraType || "",
+        e.isSubscription ? "Si" : "No",
       ]);
-      
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((r) => r.join(",")),
+      ].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `esportazione_spese_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `esportazione_spese_${format(new Date(), "yyyy-MM-dd")}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       setSuccessToast("Esportazione completata!");
       setTimeout(() => setSuccessToast(null), 3000);
     } catch (err) {
@@ -833,7 +1083,9 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center justify-center p-6">
         <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
         <h2 className="text-2xl font-black mb-2">Disconnessione in corso...</h2>
-        <p className="text-gray-500 dark:text-gray-400">Stiamo chiudendo la tua sessione in modo sicuro.</p>
+        <p className="text-gray-500 dark:text-gray-400">
+          Stiamo chiudendo la tua sessione in modo sicuro.
+        </p>
       </div>
     );
   }
@@ -842,12 +1094,14 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-mint-50 dark:bg-gray-900 p-6">
         <Loader2 className="animate-spin text-emerald-500 mb-6" size={48} />
-        <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse text-center">Inizializzazione MintFlow...</p>
-        
+        <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse text-center">
+          Inizializzazione MintFlow...
+        </p>
+
         {/* Pulsante di emergenza se il caricamento dura troppo */}
         <div className="mt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500">
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="text-[10px] font-bold text-emerald-600/50 uppercase tracking-widest hover:text-emerald-600 transition-colors"
           >
             Problemi di caricamento? Clicca qui per ricaricare
@@ -869,21 +1123,32 @@ const App: React.FC = () => {
               <ShieldAlert className="text-red-500" size={48} />
             </div>
           </div>
-          <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Accesso Sospeso</h2>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">
+            Accesso Sospeso
+          </h2>
           <p className="text-gray-500 dark:text-gray-400 font-medium mb-10 leading-relaxed px-2">
-            Il tuo account MintFlow è stato disabilitato. Contatta il supporto per riattivare l'accesso ai tuoi dati.
+            Il tuo account MintFlow è stato disabilitato. Contatta il supporto
+            per riattivare l'accesso ai tuoi dati.
           </p>
           <div className="space-y-4">
-            <a href="mailto:supporto@mintflow.com" className="flex items-center justify-center gap-2 w-full py-5 bg-emerald-500 text-white rounded-[2rem] font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95">
+            <a
+              href="mailto:supporto@mintflow.com"
+              className="flex items-center justify-center gap-2 w-full py-5 bg-emerald-500 text-white rounded-[2rem] font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95"
+            >
               <Mail size={20} /> Contatta Supporto
             </a>
-            <button onClick={handleForcedLogout} className="flex items-center justify-center gap-2 w-full py-5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 rounded-[2rem] font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-95">
+            <button
+              onClick={handleForcedLogout}
+              className="flex items-center justify-center gap-2 w-full py-5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 rounded-[2rem] font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-95"
+            >
               <LogOut size={20} /> Esci dall'account
             </button>
           </div>
           <div className="mt-12 pt-8 border-t border-gray-100 dark:border-gray-700 flex items-center justify-center gap-2 opacity-50">
             <ShieldCheck size={14} className="text-emerald-500" />
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">MintFlow Security Shield</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">
+              MintFlow Security Shield
+            </p>
           </div>
         </div>
       </div>
@@ -891,52 +1156,100 @@ const App: React.FC = () => {
   }
 
   if (!session) return <Auth onSuccess={() => setIsBanned(false)} />;
-  if (session.user.email === 'admin@mintflow.com') return <AdminDashboard onLogout={handleForcedLogout} />;
+  if (session.user.email === "admin@mintflow.com")
+    return <AdminDashboard onLogout={handleForcedLogout} />;
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
+    <Layout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
       lang={userSettings.language}
       currentProfile={userSettings.currentProfile}
       onRefresh={() => fetchExpenses(false)}
     >
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24 relative">
-        {successToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">{successToast}</div>}
-        {activeTab === 'dashboard' && <Dashboard expenses={expenses} allExpenses={allExpenses} budget={currentBudget} userName={userSettings.name} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} lang={userSettings.language} userSettings={userSettings} onUpdateSettings={setUserSettings} />}
-        {activeTab === 'list' && (
+        {successToast && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">
+            {successToast}
+          </div>
+        )}
+        {activeTab === "dashboard" && (
+          <Dashboard
+            expenses={expenses}
+            allExpenses={allExpenses}
+            budget={currentBudget}
+            userName={userSettings.name}
+            currency={userSettings.currency}
+            wallets={userSettings.wallets}
+            categories={userSettings.categories}
+            lang={userSettings.language}
+            userSettings={userSettings}
+            onUpdateSettings={setUserSettings}
+          />
+        )}
+        {activeTab === "list" && (
           <div className="space-y-6">
-            <button onClick={() => { setPrefill(null); setShowForm(true); }} className="w-full bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg transition-transform active:scale-95"><Plus size={20} /> Aggiungi Spesa</button>
-            <ExpenseList 
-              expenses={expenses} 
-              onDelete={handleDeleteExpense} 
-              onEdit={ex => { setPrefill(ex); setShowForm(true); }} 
-              currency={userSettings.currency} 
-              wallets={userSettings.wallets} 
-              categories={userSettings.categories} 
+            <button
+              onClick={() => {
+                setPrefill(null);
+                setShowForm(true);
+              }}
+              className="w-full bg-emerald-500 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg transition-transform active:scale-95"
+            >
+              <Plus size={20} /> Aggiungi Spesa
+            </button>
+            <ExpenseList
+              expenses={expenses}
+              onDelete={handleDeleteExpense}
+              onEdit={(ex) => {
+                setPrefill(ex);
+                setShowForm(true);
+              }}
+              currency={userSettings.currency}
+              wallets={userSettings.wallets}
+              categories={userSettings.categories}
               userSettings={userSettings}
               onUpdateSettings={setUserSettings}
             />
           </div>
         )}
-        {activeTab === 'ricariche' && <RicaricheView onRefill={w => { setPrefill({ description: `Ricarica ${w.name}`, category: 'Altro', paymentMethod: PaymentMethod.Bancomat, date: format(new Date(), 'yyyy-MM-dd') }); setShowForm(true); }} onSaveExpense={handleSaveExpense} onUpdateWallets={handleUpdateWallets} expenses={allExpenses} currency={userSettings.currency} wallets={userSettings.wallets} />}
-        {activeTab === 'ai' && <AiInsights expenses={expenses} />}
-        {activeTab === 'settings' && (
-          <SettingsView 
-            settings={userSettings} 
-            onUpdate={setUserSettings} 
-            onClearData={handleClearData} 
-            expenses={expenses} 
-            email={session.user.email} 
-            userId={session.user.id} 
-            onLogout={handleForcedLogout} 
+        {activeTab === "ricariche" && (
+          <RicaricheView
+            onRefill={(w) => {
+              setPrefill({
+                description: `Ricarica ${w.name}`,
+                category: "Altro",
+                paymentMethod: PaymentMethod.Bancomat,
+                date: format(new Date(), "yyyy-MM-dd"),
+              });
+              setShowForm(true);
+            }}
+            onSaveExpense={handleSaveExpense}
+            onUpdateWallets={handleUpdateWallets}
+            expenses={allExpenses}
+            currency={userSettings.currency}
+            wallets={userSettings.wallets}
+          />
+        )}
+        {activeTab === "ai" && <AiInsights expenses={expenses} />}
+        {activeTab === "settings" && (
+          <SettingsView
+            settings={userSettings}
+            onUpdate={setUserSettings}
+            onClearData={handleClearData}
+            expenses={expenses}
+            email={session.user.email}
+            userId={session.user.id}
+            onLogout={handleForcedLogout}
             onExport={handleExportCSV}
             onDeleteExpense={handleDeleteExpense}
             onDeleteMultipleExpenses={async (ids) => {
               try {
                 setIsSyncing(true);
-                await Promise.all(ids.map(id => db.deleteExpense(id)));
-                setAllExpenses(prev => prev.filter(e => !ids.includes(e.id)));
+                await Promise.all(ids.map((id) => db.deleteExpense(id)));
+                setAllExpenses((prev) =>
+                  prev.filter((e) => !ids.includes(e.id)),
+                );
                 setSuccessToast("Spese dell'archivio eliminate!");
                 setTimeout(() => setSuccessToast(null), 3000);
               } catch (err: any) {
@@ -947,15 +1260,54 @@ const App: React.FC = () => {
             }}
           />
         )}
-        {activeTab === 'subscriptions' && <SubscriptionsView expenses={expenses} onAddSub={() => { setPrefill({ isSubscription: true }); setShowForm(true); }} onEdit={ex => { setPrefill(ex); setShowForm(true); }} onDelete={handleDeleteExpense} currency={userSettings.currency} onSyncAll={handleSyncSubscriptions} />}
-        {activeTab === 'extra' && <ExtraView expenses={extraExpenses} onAdd={handleSaveExpense} onDelete={handleDeleteExpense} currency={userSettings.currency} wallets={userSettings.wallets} currentProfile={userSettings.currentProfile} />}
-        
+        {activeTab === "subscriptions" && (
+          <SubscriptionsView
+            expenses={expenses}
+            onAddSub={() => {
+              setPrefill({ isSubscription: true });
+              setShowForm(true);
+            }}
+            onEdit={(ex) => {
+              setPrefill(ex);
+              setShowForm(true);
+            }}
+            onDelete={handleDeleteExpense}
+            currency={userSettings.currency}
+            onSyncAll={handleSyncSubscriptions}
+          />
+        )}
+        {activeTab === "extra" && (
+          <ExtraView
+            expenses={extraExpenses}
+            onAdd={handleSaveExpense}
+            onDelete={handleDeleteExpense}
+            currency={userSettings.currency}
+            wallets={userSettings.wallets}
+            currentProfile={userSettings.currentProfile}
+          />
+        )}
+
         {showForm && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-2 sm:p-4">
             <div className="bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 relative animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto no-scrollbar">
-              <button onClick={() => setShowForm(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><X size={24} /></button>
-              <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 dark:text-white">{prefill?.id ? 'Modifica Spesa' : 'Nuova Spesa'}</h2>
-              <ExpenseForm onSubmit={handleSaveExpense} onCancel={() => setShowForm(false)} initialData={prefill || undefined} currency={userSettings.currency} wallets={userSettings.wallets} categories={userSettings.categories} expenses={expenses} />
+              <button
+                onClick={() => setShowForm(false)}
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+              <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 dark:text-white">
+                {prefill?.id ? "Modifica Spesa" : "Nuova Spesa"}
+              </h2>
+              <ExpenseForm
+                onSubmit={handleSaveExpense}
+                onCancel={() => setShowForm(false)}
+                initialData={prefill || undefined}
+                currency={userSettings.currency}
+                wallets={userSettings.wallets}
+                categories={userSettings.categories}
+                expenses={expenses}
+              />
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Expense, UserSettings } from '../types';
+import { Expense, UserSettings, PaymentMethod } from '../types';
 import { format, isSameMonth, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale/it';
 import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils, TrendingDown, TrendingUp, Filter, Trash2 } from 'lucide-react';
@@ -111,7 +111,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       .filter(e => isSameMonth(parseDate(e.date), selectedMonth))
       .filter(e => {
         const desc = e.description.toLowerCase();
-        return !(desc.includes('aggiustamento') || desc.includes('modifica saldo') || (desc.includes('modifica') && desc.includes('contanti')));
+        
+        let isRefill = desc.includes('ricarica');
+        if (isRefill && e.paymentMethod === PaymentMethod.Revolut && e.category === 'Benzina') isRefill = false;
+        
+        const isAdjustment = desc.includes('aggiustamento') || desc.includes('modifica saldo') || (desc.includes('modifica') && desc.includes('contanti'));
+        
+        const isBenzinaAppQ8 = e.category === 'Benzina' && 
+          (e.paymentMethod === PaymentMethod.AppQ8 || e.paymentMethod === 'App Club Q8' as any);
+          
+        return !isRefill && !isAdjustment && !isBenzinaAppQ8;
       })
       .filter(e => filterCategory === 'Tutti' || e.category === filterCategory)
       .filter(e => !hideBancomat || e.paymentMethod !== 'Bancomat')
