@@ -412,6 +412,7 @@ const App: React.FC = () => {
         let data = await Promise.race([fetchPromise, timeoutPromise]);
 
         // Sincronizza spese locali non salvate (offline sync)
+        const MAX_SYNC_ATTEMPTS = 5;
         const cachedDataStr = localStorage.getItem("mintflow_cache_v2");
         if (cachedDataStr) {
           try {
@@ -420,9 +421,16 @@ const App: React.FC = () => {
 
             if (localUnsynced.length > 0) {
               let syncCount = 0;
+              let stuckCount = 0;
+              // Spese che restano non sincronizzate (fallite o oltre il
+              // limite di tentativi): NON vanno perse, vanno riportate
+              // nella cache finale invece di essere sovrascritte.
+              const stillUnsynced: Expense[] = [];
+
               for (const exp of localUnsynced) {
+                const attempts = exp._syncAttempts || 0;
                 try {
-                  const { id, _isLocal, ...expenseData } = exp;
+                  const { id, _isLocal, _syncAttempts, _syncStuck, ...expenseData } = exp;
                   if (id.startsWith("temp-")) {
                     // Nuova spesa
                     await db.addExpense(expenseData, session.user.id);
@@ -433,13 +441,39 @@ const App: React.FC = () => {
                   syncCount++;
                 } catch (e) {
                   console.error("Errore sync spesa locale:", e);
+                  const newAttempts = attempts + 1;
+                  if (newAttempts >= MAX_SYNC_ATTEMPTS) {
+                    stuckCount++;
+                    stillUnsynced.push({
+                      ...exp,
+                      _syncAttempts: newAttempts,
+                      _syncStuck: true,
+                    });
+                  } else {
+                    stillUnsynced.push({ ...exp, _syncAttempts: newAttempts });
+                  }
                 }
               }
+
               if (syncCount > 0) {
                 // Ricarica dal server se abbiamo sincronizzato qualcosa
                 data = await db.getExpenses(session.user.id);
                 setSuccessToast(`Sincronizzate ${syncCount} spese offline!`);
                 setTimeout(() => setSuccessToast(null), 3000);
+              }
+
+              // Riaggiungi le spese non ancora sincronizzate ai dati che
+              // finiranno in cache, altrimenti spariscono senza essere
+              // né sul server né più recuperabili in locale.
+              if (stillUnsynced.length > 0) {
+                data = [...stillUnsynced, ...data];
+              }
+
+              if (stuckCount > 0) {
+                setSuccessToast(
+                  `Attenzione: ${stuckCount} spesa/e non riescono a sincronizzarsi da un po'. Controlla la connessione.`,
+                );
+                setTimeout(() => setSuccessToast(null), 6000);
               }
             }
           } catch (e) {
@@ -741,6 +775,27 @@ const App: React.FC = () => {
     userSettings,
     activeTab,
   ]);
+
+  // --- RETRY SYNC AL RITORNO IN PRIMO PIANO ---
+  // fetchExpenses() (che contiene anche il retry delle spese "_isLocal")
+  // prima partiva SOLO quando l'oggetto `session` cambiava riferimento
+  // (login/logout/refresh token). Se l'app viene semplicemente
+  // sospesa e riportata in foreground (mobile, o riapertura scheda),
+  // `session` non cambia e il retry non scattava mai: da qui il bisogno
+  // di disconnettersi e riconnettersi per forzare la sincronizzazione.
+  useEffect(() => {
+    const handleForegroundRetry = () => {
+      if (document.visibilityState === "visible" && session?.user?.id) {
+        fetchExpenses(true); // silent: nessuno spinner, nessun alert
+      }
+    };
+    document.addEventListener("visibilitychange", handleForegroundRetry);
+    window.addEventListener("focus", handleForegroundRetry);
+    return () => {
+      document.removeEventListener("visibilitychange", handleForegroundRetry);
+      window.removeEventListener("focus", handleForegroundRetry);
+    };
+  }, [session, fetchExpenses]);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 

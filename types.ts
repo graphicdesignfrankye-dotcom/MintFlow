@@ -1,4 +1,3 @@
-
 export enum PaymentMethod {
   Contanti = 'Contanti',
   Flash = 'Prepagata Flash',
@@ -31,6 +30,8 @@ export interface Expense {
   isExtra?: boolean; // Nuovo: Indica se è una spesa Extra
   extraType?: 'given' | 'received'; // Nuovo: Dato o Ricevuto
   _isLocal?: boolean; // Flag per indicare se la spesa è salvata solo localmente (non sincronizzata)
+  _syncAttempts?: number; // Numero di tentativi di sincronizzazione falliti
+  _syncStuck?: boolean; // true se ha superato il numero massimo di tentativi
 }
 
 export interface WalletConfig {
