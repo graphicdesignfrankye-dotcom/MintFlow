@@ -28,7 +28,7 @@ export interface Expense {
   isSubscription?: boolean;
   profile?: ProfileType; 
   isExtra?: boolean; // Nuovo: Indica se è una spesa Extra
-  extraType?: 'given' | 'received'; // Nuovo: Dato o Ricevuto
+  extraType?: 'given' | 'received' | 'income'; // Dato, Ricevuto, oppure entrata sul Contocorrente (es. stipendio)
   _isLocal?: boolean; // Flag per indicare se la spesa è salvata solo localmente (non sincronizzata)
   _syncAttempts?: number; // Numero di tentativi di sincronizzazione falliti
   _syncStuck?: boolean; // true se ha superato il numero massimo di tentativi
@@ -58,6 +58,7 @@ export interface UserSettings {
   monthlyIncome?: number; // Nuovo: Entrate manuali
   monthlyOutcome?: number; // Nuovo: Uscite manuali
   lastOffsetDate?: string; // Data dell'ultimo offset manuale (per reset mensile)
+  bankBalanceOffset?: number; // Saldo di partenza/correzione manuale del Contocorrente
   budgetHistory?: Record<string, { personal: number; joint?: number }>; // Storico budget per mese (YYYY-MM)
 }
 

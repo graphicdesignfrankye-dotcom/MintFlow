@@ -8,6 +8,7 @@ import { SettingsView } from "./components/SettingsView";
 import { RicaricheView } from "./components/RicaricheView";
 import { SubscriptionsView } from "./components/SubscriptionsView";
 import { ExtraView } from "./components/ExtraView";
+import { ContoCorrenteView } from "./components/ContoCorrenteView";
 import { Auth } from "./components/Auth";
 import { AdminDashboard } from "./components/AdminDashboard";
 import {
@@ -131,7 +132,19 @@ const App: React.FC = () => {
   const extraExpenses = useMemo(() => {
     const profile = userSettings.currentProfile || "personal";
     return allExpenses.filter(
-      (e) => (e.profile || "personal") === profile && e.isExtra,
+      (e) => (e.profile || "personal") === profile &&
+        e.isExtra &&
+        e.extraType !== "income",
+    );
+  }, [allExpenses, userSettings.currentProfile]);
+
+  // Movimenti del Contocorrente: tutto ciò che è pagato o incassato con Bancomat
+  const bankMovements = useMemo(() => {
+    const profile = userSettings.currentProfile || "personal";
+    return allExpenses.filter(
+      (e) =>
+        (e.profile || "personal") === profile &&
+        e.paymentMethod === PaymentMethod.Bancomat,
     );
   }, [allExpenses, userSettings.currentProfile]);
   const currentBudget = userSettings.monthlyBudget;
@@ -244,6 +257,7 @@ const App: React.FC = () => {
     | "settings"
     | "subscriptions"
     | "extra"
+    | "conto"
   >("dashboard");
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
@@ -860,7 +874,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveExpense = async (expenseData: Omit<Expense, "id">) => {
+  const handleSaveExpense = async (
+    expenseData: Omit<Expense, "id">,
+    options?: { editId: string | null },
+  ) => {
+    // Di default modifica la spesa in prefill; options.editId permette di forzare nuovo (null) o un id preciso
+    const editId = options ? options.editId : prefill?.id;
     if (!session?.user?.id) {
       setSuccessToast("Errore: Non sei connesso!");
       setTimeout(() => setSuccessToast(null), 3000);
@@ -870,7 +889,7 @@ const App: React.FC = () => {
     // 1. UI Optimistic Update
     const tempId = "temp-" + Date.now();
     const optimisticExpense: Expense = {
-      id: prefill?.id || tempId,
+      id: editId || tempId,
       ...expenseData,
       profile: userSettings.currentProfile,
       _isLocal: true, // Segna come locale finché non confermato
@@ -878,7 +897,7 @@ const App: React.FC = () => {
 
     // Aggiorna subito la UI e la CACHE
     setAllExpenses((prev) => {
-      const newState = prefill?.id
+      const newState = editId
         ? prev.map((e) =>
             e.id === optimisticExpense.id ? optimisticExpense : e,
           )
@@ -898,8 +917,8 @@ const App: React.FC = () => {
         profile: userSettings.currentProfile,
       };
 
-      const savePromise = prefill?.id
-        ? db.updateExpense(prefill.id, dataToSave)
+      const savePromise = editId
+        ? db.updateExpense(editId, dataToSave)
         : db.addExpense(dataToSave, session.user.id);
 
       // Timeout di 60 secondi per evitare blocchi (aumentato per connessioni lente)
@@ -916,7 +935,7 @@ const App: React.FC = () => {
       // Sostituisci l'ID temporaneo con quello reale se era un nuovo inserimento
       setAllExpenses((prev) => {
         const newState = prev.map((e) =>
-          e.id === (prefill?.id || tempId) ? { ...saved, _isLocal: false } : e,
+          e.id === (editId || tempId) ? { ...saved, _isLocal: false } : e,
         );
         localStorage.setItem("mintflow_cache_v2", JSON.stringify(newState));
         return newState;
@@ -1329,6 +1348,22 @@ const App: React.FC = () => {
             onDelete={handleDeleteExpense}
             currency={userSettings.currency}
             onSyncAll={handleSyncSubscriptions}
+          />
+        )}
+        {activeTab === "conto" && (
+          <ContoCorrenteView
+            movements={bankMovements}
+            currency={userSettings.currency}
+            balanceOffset={userSettings.bankBalanceOffset || 0}
+            onSetBalanceOffset={(offset) =>
+              setUserSettings((prev) => ({ ...prev, bankBalanceOffset: offset }))
+            }
+            onSaveIncome={(data, editId) => handleSaveExpense(data, { editId })}
+            onEditExpense={(ex) => {
+              setPrefill(ex);
+              setShowForm(true);
+            }}
+            onDelete={handleDeleteExpense}
           />
         )}
         {activeTab === "extra" && (

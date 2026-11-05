@@ -22,6 +22,13 @@ MintFlow è una web app (PWA) per tenere sotto controllo le spese mensili, con s
 - Registrazione delle ricariche e storico. Il saldo è cumulativo e non si azzera a fine mese.
 - Correzione manuale del saldo, che cambia solo il valore mostrato e non crea transazioni.
 
+### Contocorrente
+- Scheda dedicata al conto: mostra il **saldo attuale**, le entrate e le uscite del mese e l'elenco dei movimenti raggruppati per mese.
+- L'elenco contiene tutte le spese pagate con **Bancomat** (comprese le ricariche dei portafogli) e le entrate che aggiungi.
+- Il tasto **Aggiungi entrata** registra, per esempio, lo stipendio (con scorciatoie Stipendio, Rimborso, Regalo). Le entrate si possono modificare ed eliminare.
+- Il saldo è cumulativo: entrate meno spese Bancomat, più un saldo di partenza che imposti con la matita (non crea movimenti). I movimenti con data futura risultano "in programma" e non sono ancora sottratti.
+- Le entrate non entrano nei totali delle spese e non compaiono nella scheda Extra.
+
 ### Abbonamenti
 - Una spesa può essere segnata come *abbonamento ricorrente*.
 - Elenco degli abbonamenti attivi con costo mensile fisso.
@@ -108,6 +115,7 @@ Altri comandi:
 │   ├── ExpenseList.tsx   Lista con ricerca e filtri
 │   ├── RicaricheView.tsx Portafogli e ricariche
 │   ├── SubscriptionsView.tsx  Abbonamenti
+│   ├── ContoCorrenteView.tsx  Saldo e movimenti del conto (Bancomat), entrate
 │   ├── ExtraView.tsx     Movimenti "Ho dato / Ho ricevuto"
 │   ├── HistoryView.tsx   Archivio storico
 │   ├── AiInsights.tsx    Consigli generati da Gemini

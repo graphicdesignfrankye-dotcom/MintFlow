@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, List, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft, Bell, X, Trash2, Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, List, Landmark, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft, Bell, X, Trash2, Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { translations } from '../utils/i18n';
 import { ProfileType, AppNotification } from '../types';
 import { supabase, db } from '../services/supabase';
@@ -8,8 +8,8 @@ import { ConfirmModal } from './ConfirmModal';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra';
-  setActiveTab: (tab: 'dashboard' | 'list' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra') => void;
+  activeTab: 'dashboard' | 'list' | 'conto' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra';
+  setActiveTab: (tab: 'dashboard' | 'list' | 'conto' | 'ai' | 'settings' | 'ricariche' | 'subscriptions' | 'extra') => void;
   lang?: 'it' | 'en';
   currentProfile?: ProfileType;
   onRefresh?: () => void;
@@ -117,7 +117,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
       {/* Header Desktop */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-4xl xl:max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
@@ -189,6 +189,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           <div className="hidden md:flex items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
             <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={18} />} label={t.dashboard} />
             <NavButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<List size={18} />} label={t.expenses} />
+            <NavButton active={activeTab === 'conto'} onClick={() => setActiveTab('conto')} icon={<Landmark size={18} />} label={t.bank} />
             <NavButton active={activeTab === 'extra'} onClick={() => setActiveTab('extra')} icon={<ArrowRightLeft size={18} />} label={t.extra} />
             <NavButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} icon={<Repeat size={18} />} label={t.subscriptions} />
             <NavButton active={activeTab === 'ricariche'} onClick={() => setActiveTab('ricariche')} icon={<Zap size={18} />} label={t.wallets} />
@@ -255,6 +256,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           label={t.expenses}
         />
         <MobileNavButton 
+          active={activeTab === 'conto'} 
+          onClick={() => setActiveTab('conto')}
+          icon={<Landmark />}
+          label="Conto"
+        />
+        <MobileNavButton 
           active={activeTab === 'extra'} 
           onClick={() => setActiveTab('extra')}
           icon={<ArrowRightLeft />}
@@ -292,6 +299,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 const NavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
+    title={label}
     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
       active 
         ? 'bg-emerald-500 text-white shadow-md font-semibold' 
@@ -299,7 +307,7 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
     }`}
   >
     {icon}
-    <span className="text-sm">{label}</span>
+    <span className={`text-sm ${active ? '' : 'hidden xl:inline'}`}>{label}</span>
   </button>
 );
 

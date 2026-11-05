@@ -28,7 +28,7 @@ const unpackDescription = (packedStr: string) => {
       isSub: false, 
       profile: 'personal' as ProfileType,
       isExtra: false,
-      extraType: 'given' as 'given' | 'received'
+      extraType: 'given' as 'given' | 'received' | 'income'
     };
   }
   const parts = packedStr.split(PACK_SEP);
@@ -38,7 +38,7 @@ const unpackDescription = (packedStr: string) => {
     isSub: parts[2] === 'true',
     profile: (parts[3] as ProfileType) || 'personal',
     isExtra: parts[4] === 'true',
-    extraType: (parts[5] as 'given' | 'received') || 'given'
+    extraType: (parts[5] as 'given' | 'received' | 'income') || 'given'
   };
 };
 

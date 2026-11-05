@@ -6,6 +6,7 @@ export const translations = {
       expenses: 'Spese',
       subscriptions: 'Abbonamenti',
       wallets: 'Ricariche',
+      bank: 'Contocorrente',
       ai: 'AI Insights',
       settings: 'Impostazioni',
       extra: 'Extra'
@@ -54,6 +55,7 @@ export const translations = {
       expenses: 'Expenses',
       subscriptions: 'Subscriptions',
       wallets: 'Wallets',
+      bank: 'Bank account',
       ai: 'AI Insights',
       settings: 'Settings',
       extra: 'Extra'
