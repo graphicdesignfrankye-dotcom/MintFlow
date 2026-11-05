@@ -49,10 +49,11 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onDetected, onCl
     const context = canvasRef.current.getContext('2d');
     if (!context) return;
 
-    // Set canvas size to match video
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    context.drawImage(videoRef.current, 0, 0);
+    // Ridimensiona a max 1600px sul lato lungo: immagine più leggera da inviare
+    const scale = Math.min(1, 1600 / Math.max(videoRef.current.videoWidth, videoRef.current.videoHeight));
+    canvasRef.current.width = Math.round(videoRef.current.videoWidth * scale);
+    canvasRef.current.height = Math.round(videoRef.current.videoHeight * scale);
+    context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
 
     const base64Image = canvasRef.current.toDataURL('image/jpeg', 0.8);
     

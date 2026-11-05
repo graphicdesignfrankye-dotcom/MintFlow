@@ -117,9 +117,11 @@ Altri comandi:
 │   ├── SmartCategorizer.tsx  Suggerimento categoria
 │   ├── ReceiptScanner.tsx    Lettura scontrini con Gemini
 │   └── ConfirmModal.tsx  Finestra di conferma
+├── api/
+│   └── gemini.ts         Funzione server (Vercel): unico punto che usa la chiave Gemini
 ├── services/
 │   ├── supabase.ts       Client Supabase, autenticazione e accesso ai dati
-│   └── gemini.ts         Chiamate a Gemini
+│   └── gemini.ts         Chiamate a /api/gemini
 ├── utils/i18n.ts         Traduzioni italiano / inglese
 └── public/               Icone, favicon e manifest della PWA
 ```
@@ -130,4 +132,5 @@ Altri comandi:
 - **Formato delle spese**: nella tabella `expenses` il metodo di pagamento, l'abbonamento, il profilo e i dati "Extra" sono salvati nel campo `description`, separati da ` |#| `. Va tenuto presente se leggi i dati direttamente dal database.
 - **Cache locale**: le spese sono in `localStorage` alla chiave `mintflow_cache_v2`, le impostazioni in `mintflow_user_settings`.
 - **PWA**: icone e manifest sono in `public/` e vengono copiati nella build. Su iPhone e Android l'app si può aggiungere alla schermata Home.
-- **Variabili d'ambiente**: `GEMINI_API_KEY` è letta da `vite.config.ts` e inserita nel codice inviato al browser, quindi chi apre il sito può leggerla. Limita la chiave su Google AI Studio (restrizioni sul dominio e quota) oppure sposta le chiamate a Gemini su un piccolo backend. Non mettere mai la service role key di Supabase in variabili `VITE_`.
+- **Chiave Gemini**: non arriva mai al browser. Le chiamate passano da `api/gemini.ts`, una funzione server di Vercel che verifica il token di accesso Supabase dell'utente, costruisce i prompt lato server, accetta immagini fino a circa 3 MB e limita a 10 richieste al minuto per utente (controllo per istanza, quindi indicativo). Su Vercel crea la variabile `GEMINI_API_KEY` (senza prefisso `VITE_`); in locale mettila in `.env.local`, e `npm run dev` serve `/api/gemini` da solo. Conviene impostare anche una quota giornaliera su Google Cloud.
+- **Variabili `VITE_`**: finiscono nel codice inviato al browser. Non ci vanno mai messi segreti, in particolare la service role key di Supabase.
