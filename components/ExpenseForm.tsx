@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { CategoryConfig, Expense, PaymentMethod, WalletConfig } from '../types';
 import { SmartCategorizer } from './SmartCategorizer';
-import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap, Copy } from 'lucide-react';
+import { ReceiptScanner } from './ReceiptScanner';
+import { Loader2, Save, Repeat, Building, CreditCard, Banknote, Fuel, AlertTriangle, Check, Zap, Copy, ScanLine } from 'lucide-react';
 import { isSameMonth, isAfter } from 'date-fns';
+import { createPortal } from 'react-dom';
 
 interface ExpenseFormProps {
   onSubmit: (expense: Omit<Expense, 'id'>) => Promise<void> | void;
@@ -31,6 +33,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubscription, setIsSubscription] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   
   // Stato per il modale di conferma personalizzato
   const [showConfirmModal, setShowConfirmModal] = useState<{show: boolean, type: 'future' | 'past' | 'duplicate' | null}>({
@@ -50,6 +53,14 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
       setCategory(categories[categories.length - 1]?.name || 'Altro');
     }
   }, [initialData, categories]);
+
+  const handleReceiptDetected = (data: { description: string; amount: number; category: string; paymentMethod?: PaymentMethod }) => {
+    if (data.description) setDescription(data.description);
+    if (data.amount > 0) setAmount(data.amount.toString());
+    if (categories.some(c => c.name === data.category)) setCategory(data.category);
+    if (data.paymentMethod && [PaymentMethod.Bancomat, ...wallets.map(w => w.method)].includes(data.paymentMethod)) setPaymentMethod(data.paymentMethod);
+    setShowScanner(false);
+  };
 
   const validateAndProcess = () => {
     const parsedAmount = parseFloat(amount.replace(',', '.'));
@@ -129,6 +140,12 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   return (
     <div className="relative">
       <form onSubmit={(e) => { e.preventDefault(); validateAndProcess(); }} className="space-y-3 sm:space-y-4">
+        {!initialData?.id && (
+          <button type="button" onClick={() => setShowScanner(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+            <ScanLine size={16} /> Scansiona scontrino con AI
+          </button>
+        )}
+
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Descrizione</label>
           <input 
@@ -201,6 +218,13 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
           </button>
         </div>
       </form>
+
+      {showScanner && createPortal(
+        <div className="fixed inset-0 z-[200]">
+          <ReceiptScanner onDetected={handleReceiptDetected} onClose={() => setShowScanner(false)} />
+        </div>,
+        document.body
+      )}
 
       {/* MODALE DI CONFERMA PERSONALIZZATO */}
       {showConfirmModal.show && (

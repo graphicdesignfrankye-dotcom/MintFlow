@@ -85,14 +85,6 @@ export const AiInsights: React.FC<AiInsightsProps> = ({ expenses }) => {
           ))
         )}
       </div>
-
-      <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2rem] text-white">
-        <h3 className="text-xl font-bold mb-2">Pianificatore Futuro</h3>
-        <p className="text-emerald-50 text-sm mb-4">In base alle tue spese, il tuo budget previsto per il prossimo mese è simile a quello attuale. Vuoi impostare un obiettivo di risparmio?</p>
-        <button className="bg-white text-emerald-600 px-6 py-2 rounded-xl font-bold hover:bg-emerald-50 transition-colors text-sm">
-          Imposta Obiettivo
-        </button>
-      </div>
     </div>
   );
 };

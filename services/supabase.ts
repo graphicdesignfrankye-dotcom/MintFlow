@@ -14,17 +14,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// Client Admin opzionale (usato solo se la chiave è presente e valida)
-// Aggiunto storageKey dedicato per evitare conflitti con il client principale
-export const supabaseAdmin = createClient(SUPABASE_URL, import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'SERVICE_ROLE_KEY_HERE', {
-  auth: { 
-    autoRefreshToken: false, 
-    persistSession: false,
-    detectSessionInUrl: false,
-    storageKey: 'mintflow-admin-auth-token'
-  }
-});
-
 const PACK_SEP = ' |#| ';
 
 const packDescription = (desc: string, pm: PaymentMethod, isSub: boolean, profile: ProfileType, isExtra: boolean, extraType: string) => {
