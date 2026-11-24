@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { ExpenseList } from "./components/ExpenseList";
@@ -29,7 +29,17 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { db, auth, supabase } from "./services/supabase";
+import { createDefaultSettings } from "./utils/defaultSettings";
+import {
+  mergeSavedSettings,
+  resolveSpendingRule,
+  refillCountsAsSpending,
+  isCountedAtRefill,
+} from "./utils/spendingRule";
 import { format, isSameMonth } from "date-fns";
+
+// Id dell'account a cui appartengono i dati salvati nel browser (impostazioni e cache delle spese)
+const LOCAL_OWNER_KEY = "mintflow_local_owner";
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -44,63 +54,14 @@ const App: React.FC = () => {
 
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem("mintflow_user_settings");
-    const defaultWallets: WalletConfig[] = [
-      {
-        id: "w0",
-        name: "Contanti",
-        method: PaymentMethod.Contanti,
-        icon: "wallet",
-      },
-      {
-        id: "w1",
-        name: "Prepagata Flash",
-        method: PaymentMethod.Flash,
-        icon: "zap",
-      },
-      {
-        id: "w2",
-        name: "Prepagata Revolut",
-        method: PaymentMethod.Revolut,
-        icon: "credit-card",
-      },
-      { id: "w3", name: "App Q8", method: PaymentMethod.AppQ8, icon: "fuel" },
-    ];
-
-    const defaultCategories: CategoryConfig[] = [
-      { id: "c1", name: "Sigarette", color: "#ef4444" },
-      { id: "c2", name: "Benzina", color: "#f97316" },
-      { id: "c3", name: "Autostrada", color: "#eab308" },
-      { id: "c4", name: "Ricarica Chiavetta", color: "#84cc16" },
-      { id: "c5", name: "Svago", color: "#06b6d4" },
-      { id: "c6", name: "Salute", color: "#ec4899" },
-      {
-        id: "c7",
-        name: "Abbonamenti",
-        isSubscriptionDefault: true,
-        color: "#8b5cf6",
-      },
-      { id: "c8", name: "Altro", color: "#64748b" },
-    ];
-
-    const defaultSettings: UserSettings = {
-      name: "Utente",
-      monthlyBudget: 1000,
-      currency: "€",
-      isDarkMode: false,
-      wallets: defaultWallets,
-      categories: defaultCategories,
-      language: "it",
-      currentProfile: "personal",
-      monthlyOffset: 0,
-      lastOffsetDate: new Date().toISOString(),
-    };
+    const defaultSettings = createDefaultSettings();
 
     if (!saved) return defaultSettings;
     try {
       const parsed = JSON.parse(saved);
+      // Se le impostazioni salvate non hanno la regola, l'utente esisteva già: mantiene quella storica
       const merged = {
-        ...defaultSettings,
-        ...parsed,
+        ...mergeSavedSettings(defaultSettings, parsed),
         currentProfile: "personal",
       };
       const now = new Date();
@@ -149,23 +110,69 @@ const App: React.FC = () => {
   }, [allExpenses, userSettings.currentProfile]);
   const currentBudget = userSettings.monthlyBudget;
 
+  // Le impostazioni locali vengono salvate nel cloud solo dopo aver letto quelle del cloud:
+  // così i dati rimasti nel browser da un altro account non finiscono sul profilo di un nuovo utente.
+  const [cloudSettingsReady, setCloudSettingsReady] = useState(false);
+  const ownerCheck = useRef<{ userId: string; isOtherOwner: boolean } | null>(null);
+
   // Carica le impostazioni dal Cloud quando la sessione è pronta
   useEffect(() => {
+    const userId: string | undefined = session?.user?.id;
+    if (!userId) {
+      setCloudSettingsReady(false);
+      return;
+    }
+    let cancelled = false;
+    setCloudSettingsReady(false);
+
+    // Dati locali di un altro account (stesso browser, uscita senza il pulsante Esci):
+    // non devono passare al nuovo utente. Si controlla una volta sola per account.
+    if (ownerCheck.current?.userId !== userId) {
+      const owner = localStorage.getItem(LOCAL_OWNER_KEY);
+      ownerCheck.current = { userId, isOtherOwner: owner !== userId };
+      if (owner && owner !== userId) {
+        console.log("Dati locali di un altro account: li azzero.");
+        localStorage.removeItem("mintflow_cache_v2");
+        localStorage.removeItem("mintflow_expenses");
+        localStorage.removeItem("mintflow_user_settings");
+        setAllExpenses([]);
+        setUserSettings(createDefaultSettings());
+      }
+      localStorage.setItem(LOCAL_OWNER_KEY, userId);
+    }
+    const isOtherOwner = ownerCheck.current.isOtherOwner;
+
     const loadCloudSettings = async () => {
-      if (session?.user?.id) {
-        try {
-          console.log("Carico impostazioni dal cloud (profiles)...");
-          const profile = await db.getProfile(session.user.id);
-          if (profile?.settings) {
-            console.log("Impostazioni cloud trovate:", profile.settings);
-            setUserSettings((prev) => ({ ...prev, ...profile.settings }));
-          }
-        } catch (err) {
-          console.error("Errore caricamento settings dal profilo:", err);
+      try {
+        console.log("Carico impostazioni dal cloud (profiles)...");
+        const profile = await db.getProfile(userId);
+        if (cancelled) return;
+        if (profile?.settings) {
+          console.log("Impostazioni cloud trovate:", profile.settings);
+          setUserSettings((prev) => mergeSavedSettings(prev, profile.settings));
+        } else if (isOtherOwner) {
+          // Account nuovo (nessuna impostazione nel cloud) e dati locali non suoi: parte dai valori generici
+          console.log("Account nuovo: parto dalle impostazioni generiche.");
+          localStorage.removeItem("mintflow_cache_v2");
+          setAllExpenses([]);
+          setUserSettings(createDefaultSettings());
         }
+      } catch (err) {
+        console.error("Errore caricamento settings dal profilo:", err);
+      } finally {
+        if (!cancelled) setCloudSettingsReady(true);
       }
     };
     loadCloudSettings();
+
+    // Rete lenta: dopo 10 secondi riprendo comunque a salvare
+    const safety = setTimeout(() => {
+      if (!cancelled) setCloudSettingsReady(true);
+    }, 10000);
+    return () => {
+      cancelled = true;
+      clearTimeout(safety);
+    };
   }, [session?.user?.id]);
 
   // Sincronizzazione Realtime delle Impostazioni
@@ -205,7 +212,7 @@ const App: React.FC = () => {
 
               setSuccessToast("Impostazioni sincronizzate!");
               setTimeout(() => setSuccessToast(null), 2000);
-              return { ...prev, ...payload.new.settings };
+              return mergeSavedSettings(prev, payload.new.settings);
             });
           }
         },
@@ -235,7 +242,7 @@ const App: React.FC = () => {
       setUserSettings((prev) => ({ ...prev, budgetHistory: newHistory }));
     }
 
-    if (session?.user?.id) {
+    if (session?.user?.id && cloudSettingsReady) {
       const timeoutId = setTimeout(async () => {
         console.log("Salvataggio impostazioni in cloud (profiles)...");
         try {
@@ -247,7 +254,7 @@ const App: React.FC = () => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [userSettings, session]);
+  }, [userSettings, session, cloudSettingsReady]);
 
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
@@ -639,6 +646,7 @@ const App: React.FC = () => {
             return isSameMonth(expenseDate, currentMonthDate);
           });
 
+          const rule = resolveSpendingRule(userSettings);
           const calculatedTotal = currentMonthExpenses
             .filter((e) => {
               const [y, m, d] = e.date.split("-").map(Number);
@@ -646,23 +654,15 @@ const App: React.FC = () => {
               if (expenseDate > new Date()) return false;
 
               let isRefill = e.description.toLowerCase().includes("ricarica");
-              if (
-                isRefill &&
-                e.paymentMethod === PaymentMethod.Revolut &&
-                e.category === "Benzina"
-              )
-                isRefill = false;
+              if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
 
               const isAdjustment =
                 e.description.toLowerCase().includes("aggiustamento") ||
                 e.description.toLowerCase().includes("modifica");
 
-              const isBenzinaAppQ8 =
-                e.category === "Benzina" &&
-                (e.paymentMethod === PaymentMethod.AppQ8 ||
-                  e.paymentMethod === ("App Club Q8" as any));
+              const countedAtRefill = isCountedAtRefill(e, rule);
 
-              return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+              return !isRefill && !isAdjustment && !countedAtRefill;
             })
             .reduce((sum, e) => sum + e.amount, 0);
 

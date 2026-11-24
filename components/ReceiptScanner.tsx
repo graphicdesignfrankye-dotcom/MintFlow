@@ -2,16 +2,17 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Camera, X, Loader2, Sparkles, Check } from 'lucide-react';
 import { analyzeReceipt } from '../services/gemini';
-import { PaymentMethod } from '../types';
 // Fixed: Removed non-existent Category import from types
 
 interface ReceiptScannerProps {
   // Fixed: changed category type to string
-  onDetected: (data: { description: string; amount: number; category: string; paymentMethod?: PaymentMethod }) => void;
+  onDetected: (data: { description: string; amount: number; category: string; paymentMethod?: string }) => void; // paymentMethod = nome del portafoglio scelto
   onClose: () => void;
+  categories?: string[]; // nomi delle categorie dell'utente, tra cui Gemini sceglie
+  paymentMethods?: string[]; // nomi dei portafogli dell'utente, tra cui Gemini sceglie
 }
 
-export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onDetected, onClose }) => {
+export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onDetected, onClose, categories = [], paymentMethods = [] }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -60,7 +61,7 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({ onDetected, onCl
     setAnalyzing(true);
     stopCamera();
 
-    const result = await analyzeReceipt(base64Image);
+    const result = await analyzeReceipt(base64Image, categories, paymentMethods);
     
     if (result) {
       onDetected(result);

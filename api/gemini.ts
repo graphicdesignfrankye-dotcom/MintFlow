@@ -8,12 +8,14 @@ const SUPABASE_URL = 'https://jpcweqcqysxgzycftzyv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
 
 const MODEL = 'gemini-3-flash-preview';
-const PAYMENT_METHODS = ['Contanti', 'Prepagata Flash', 'Prepagata Revolut', 'App Q8', 'Bancomat', 'Wallet Extra 1', 'Wallet Extra 2', 'Wallet Extra 3'];
 
 const MAX_EXPENSES = 50;
 const MAX_IMAGE_CHARS = 4_000_000; // base64, circa 3 MB di immagine (il limite di Vercel sul corpo è 4.5 MB)
 const RATE_LIMIT = 10;             // richieste per utente al minuto (per istanza, best effort)
 const RATE_WINDOW_MS = 60_000;
+
+const MAX_CATEGORIES = 30;
+const MAX_METHODS = 20;
 
 const hits = new Map<string, number[]>();
 
@@ -42,6 +44,18 @@ const getUserId = async (authHeader: string | undefined): Promise<string | null>
   } catch {
     return null;
   }
+};
+
+// Nomi scelti dall'utente (categorie, portafogli): stringhe brevi, senza duplicati, al massimo `max`
+const cleanNames = (raw: unknown, max: number): string[] => {
+  if (!Array.isArray(raw)) return [];
+  const names = new Set<string>();
+  for (const c of raw) {
+    const name = typeof c === 'string' ? c.replace(/[\r\n]+/g, ' ').trim().slice(0, 40) : '';
+    if (name) names.add(name);
+    if (names.size >= max) break;
+  }
+  return [...names];
 };
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -84,13 +98,16 @@ const insights = async (ai: GoogleGenAI, rawExpenses: unknown) => {
   return JSON.parse(response.text || '[]');
 };
 
-const receipt = async (ai: GoogleGenAI, image: string) => {
+const receipt = async (ai: GoogleGenAI, image: string, userCategories: string[], userMethods: string[]) => {
+  const categories = userCategories.length ? userCategories : ['Altro'];
+  // Metodi di pagamento = portafogli dell'utente; "Bancomat" è sempre disponibile
+  const methods = userMethods.includes('Bancomat') ? userMethods : [...userMethods, 'Bancomat'];
   const prompt = `Analizza questa immagine di uno scontrino o ricevuta.
   Estrai:
   1. Una breve descrizione (es: Nome negozio o prodotto principale)
   2. L'importo totale (numero decimale)
-  3. La categoria più adatta esclusivamente tra queste: Sigarette, Benzina, Autostrada, Ricarica Chiavetta, Svago, Salute, Altro.
-  4. Il metodo di pagamento probabile tra questi: Contanti, Prepagata Flash, Prepagata Revolut, App Q8. Se non è chiaro o ci sono riferimenti a carte generiche
+  3. La categoria più adatta esclusivamente tra queste (elenco JSON): ${JSON.stringify(categories)}.
+  4. Il metodo di pagamento probabile tra questi (elenco JSON): ${JSON.stringify(methods)}. Se non è chiaro o si tratta di una carta generica, scegli "Bancomat".
 
   Ritorna solo JSON.`;
 
@@ -109,8 +126,8 @@ const receipt = async (ai: GoogleGenAI, image: string) => {
         properties: {
           description: { type: Type.STRING },
           amount: { type: Type.NUMBER },
-          category: { type: Type.STRING },
-          paymentMethod: { type: Type.STRING, enum: PAYMENT_METHODS }
+          category: { type: Type.STRING, enum: categories },
+          paymentMethod: { type: Type.STRING, enum: methods }
         },
         required: ['description', 'amount', 'category', 'paymentMethod']
       }
@@ -143,7 +160,7 @@ export default async function handler(req: any, res: any) {
       const image = typeof body.image === 'string' ? body.image : '';
       if (!image) return res.status(400).json({ error: 'Immagine mancante' });
       if (image.length > MAX_IMAGE_CHARS) return res.status(413).json({ error: 'Immagine troppo grande' });
-      return res.status(200).json({ receipt: await receipt(ai, image) });
+      return res.status(200).json({ receipt: await receipt(ai, image, cleanNames(body.categories, MAX_CATEGORIES), cleanNames(body.paymentMethods, MAX_METHODS)) });
     }
     return res.status(400).json({ error: 'Azione non valida' });
   } catch (error) {

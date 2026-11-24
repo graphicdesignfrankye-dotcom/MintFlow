@@ -9,7 +9,7 @@ MintFlow è una web app (PWA) per tenere sotto controllo le spese mensili, con s
 - **Scansione scontrino**: dal form "Nuova Spesa" scatti una foto e Gemini compila descrizione, importo, categoria e metodo di pagamento (da controllare prima di salvare). Serve il permesso per la fotocamera.
 - Suggerimento automatico della categoria mentre scrivi la descrizione (parole chiave come sigarette, benzina, autostrada, Netflix/Spotify).
 - Lista spese con ricerca testuale e filtri per categoria e metodo di pagamento; modifica ed eliminazione di ogni voce.
-- Categorie personalizzabili (nome e colore). Predefinite: Sigarette, Benzina, Autostrada, Ricarica Chiavetta, Svago, Salute, Abbonamenti, Altro.
+- Categorie personalizzabili (nome e colore). Un nuovo utente parte con categorie generiche (Categoria 1–5) più Abbonamenti e Altro, e le rinomina da Impostazioni → Cambia Categorie. Chi ha già le proprie categorie le mantiene.
 
 ### Dashboard
 - Totale speso nel mese rispetto al budget mensile e confronto con il mese scorso.
@@ -18,9 +18,10 @@ MintFlow è una web app (PWA) per tenere sotto controllo le spese mensili, con s
 - Possibilità di correggere a mano il totale mensile; la correzione si azzera a ogni nuovo mese.
 
 ### Portafogli e ricariche
-- Portafogli predefiniti: Contanti, Prepagata Flash, Prepagata Revolut, App Q8; ne puoi creare e rinominare altri.
+- Un nuovo utente parte con Contanti e tre portafogli generici (Portafoglio 1–3), che rinomina da Impostazioni → Cambia Ricariche; ne puoi creare e rinominare altri. Chi ha già i propri portafogli li mantiene.
 - Registrazione delle ricariche e storico. Il saldo è cumulativo e non si azzera a fine mese.
 - Correzione manuale del saldo, che cambia solo il valore mostrato e non crea transazioni.
+- **Spese già contate alla ricarica** (opzionale, in Impostazioni): se ricarichi un portafoglio, per esempio una carta carburante, e conti la spesa alla ricarica, scegli categoria, portafoglio e metodo con cui paghi la ricarica. Le spese di quella categoria pagate con quel portafoglio non si contano due volte nei totali. Un nuovo utente parte senza questa regola; chi c'era già mantiene quella usata finora (Benzina, App Q8, ricarica con Revolut).
 
 ### Contocorrente
 - Scheda dedicata al conto: mostra il **saldo attuale**, le entrate e le uscite del mese e l'elenco dei movimenti raggruppati per mese.
@@ -122,6 +123,7 @@ Altri comandi:
 │   ├── HistoryView.tsx   Archivio storico
 │   ├── AiInsights.tsx    Consigli generati da Gemini
 │   ├── SettingsView.tsx  Profilo, portafogli, categorie, CSV, sicurezza
+│   ├── SpendingRuleCard.tsx  Scelta della regola "spese già contate alla ricarica"
 │   ├── Auth.tsx          Accesso e registrazione
 │   ├── AdminDashboard.tsx  Pannello amministratore
 │   ├── SmartCategorizer.tsx  Suggerimento categoria
@@ -133,6 +135,7 @@ Altri comandi:
 │   ├── supabase.ts       Client Supabase, autenticazione e accesso ai dati
 │   └── gemini.ts         Chiamate a /api/gemini
 ├── utils/i18n.ts         Traduzioni italiano / inglese
+├── utils/spendingRule.ts Regola "spese già contate alla ricarica" (valori di partenza e calcolo)
 └── public/               Icone, favicon e manifest della PWA
 ```
 

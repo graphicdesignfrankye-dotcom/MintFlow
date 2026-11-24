@@ -42,6 +42,14 @@ export interface WalletConfig {
   balanceOffset?: number; // Saldo manuale (offset)
 }
 
+// Regola opzionale "spese già contate alla ricarica" (evita il doppio conteggio con portafogli ricaricabili)
+export interface SpendingRule {
+  enabled: boolean;
+  category: string;        // categoria a cui si applica
+  walletMethods: string[]; // le spese di questa categoria pagate con questi metodi non si contano di nuovo
+  refillMethods: string[]; // le ricariche (descrizione "Ricarica ...") pagate con questi metodi contano come spesa
+}
+
 export interface UserSettings {
   name: string;
   monthlyBudget: number; // Budget Personale
@@ -58,6 +66,7 @@ export interface UserSettings {
   monthlyIncome?: number; // Nuovo: Entrate manuali
   monthlyOutcome?: number; // Nuovo: Uscite manuali
   lastOffsetDate?: string; // Data dell'ultimo offset manuale (per reset mensile)
+  spendingRule?: SpendingRule; // se manca (utenti già esistenti) vale la regola storica, vedi utils/spendingRule.ts
   bankBalanceOffset?: number; // Saldo di partenza/correzione manuale del Contocorrente
   budgetHistory?: Record<string, { personal: number; joint?: number }>; // Storico budget per mese (YYYY-MM)
 }

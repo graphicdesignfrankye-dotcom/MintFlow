@@ -4,6 +4,7 @@ import { format, isSameMonth, isFuture } from 'date-fns';
 import { it } from 'date-fns/locale/it';
 import { Calendar, ChevronLeft, ArrowRight, History as HistoryIcon, Download, Layers, Cigarette, Fuel, Car, Zap, Gamepad2, Heart, Repeat, ShoppingBag, Utensils, TrendingDown, TrendingUp, Filter, Trash2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { resolveSpendingRule, refillCountsAsSpending, isCountedAtRefill } from '../utils/spendingRule';
 
 interface HistoryViewProps {
   expenses: Expense[];
@@ -105,6 +106,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     return <ShoppingBag size={20} />;
   };
 
+  const rule = resolveSpendingRule(settings);
+
   const monthExpenses = React.useMemo(() => {
     if (!selectedMonth) return [];
     return expenses
@@ -113,19 +116,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         const desc = e.description.toLowerCase();
         
         let isRefill = desc.includes('ricarica');
-        if (isRefill && e.paymentMethod === PaymentMethod.Revolut && e.category === 'Benzina') isRefill = false;
+        if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
         
         const isAdjustment = desc.includes('aggiustamento') || desc.includes('modifica saldo') || (desc.includes('modifica') && desc.includes('contanti'));
         
-        const isBenzinaAppQ8 = e.category === 'Benzina' && 
-          (e.paymentMethod === PaymentMethod.AppQ8 || e.paymentMethod === 'App Club Q8' as any);
+        const countedAtRefill = isCountedAtRefill(e, rule);
           
-        return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+        return !isRefill && !isAdjustment && !countedAtRefill;
       })
       .filter(e => filterCategory === 'Tutti' || e.category === filterCategory)
       .filter(e => !hideBancomat || e.paymentMethod !== 'Bancomat')
       .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
-  }, [expenses, selectedMonth, filterCategory, hideBancomat]);
+  }, [expenses, selectedMonth, filterCategory, hideBancomat, rule]);
 
   const exportToCSV = () => {
     const filteredExpenses = filterCategory === 'Tutti' 

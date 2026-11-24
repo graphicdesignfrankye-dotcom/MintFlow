@@ -38,6 +38,7 @@ import {
 } from "date-fns";
 import { it } from "date-fns/locale/it";
 
+import { resolveSpendingRule, refillCountsAsSpending, isCountedAtRefill } from "../utils/spendingRule";
 interface ExpenseListProps {
   expenses: Expense[];
   onDelete: (id: string) => void;
@@ -73,6 +74,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   const currentMonthDate = new Date();
 
   // Spese del mese corrente (per il calcolo del totale uscite)
+  const rule = resolveSpendingRule(userSettings);
   const realExpensesSum = useMemo(() => {
     return expenses
       .filter((e) => {
@@ -83,24 +85,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
         const desc = e.description.toLowerCase();
         let isRefill = desc.includes("ricarica");
-        if (
-          isRefill &&
-          e.paymentMethod === PaymentMethod.Revolut &&
-          e.category === "Benzina"
-        )
-          isRefill = false;
+        if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
 
         const isAdjustment =
           desc.includes("aggiustamento") || desc.includes("modifica");
-        const isBenzinaAppQ8 =
-          e.category === "Benzina" &&
-          (e.paymentMethod === PaymentMethod.AppQ8 ||
-            e.paymentMethod === ("App Club Q8" as any));
+        const countedAtRefill = isCountedAtRefill(e, rule);
 
-        return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+        return !isRefill && !isAdjustment && !countedAtRefill;
       })
       .reduce((sum, e) => sum + e.amount, 0);
-  }, [expenses]);
+  }, [expenses, rule]);
 
   const handleSaveIncome = () => {
     if (!userSettings || !onUpdateSettings) return;

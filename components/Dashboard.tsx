@@ -43,6 +43,7 @@ import { format, isSameMonth, isFuture } from "date-fns";
 import { it } from "date-fns/locale/it";
 import { enUS } from "date-fns/locale/en-US";
 import { translations } from "../utils/i18n";
+import { resolveSpendingRule, refillCountsAsSpending, isCountedAtRefill } from "../utils/spendingRule";
 
 // Helper functions to replace date-fns missing exports
 const subMonths = (date: Date, amount: number): Date => {
@@ -114,6 +115,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpdateSettings,
 }) => {
   const t = translations[lang].dashboard;
+  const rule = resolveSpendingRule(userSettings);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -152,26 +154,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         // Escludi ricariche e aggiustamenti tecnici
         let isRefill = e.description.toLowerCase().includes("ricarica");
-        if (
-          isRefill &&
-          e.paymentMethod === PaymentMethod.Revolut &&
-          e.category === "Benzina"
-        )
-          isRefill = false;
+        if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
 
         const isAdjustment =
           e.description.toLowerCase().includes("aggiustamento") ||
           e.description.toLowerCase().includes("modifica");
 
-        const isBenzinaAppQ8 =
-          e.category === "Benzina" &&
-          (e.paymentMethod === PaymentMethod.AppQ8 ||
-            e.paymentMethod === ("App Club Q8" as any));
+        const countedAtRefill = isCountedAtRefill(e, rule);
 
-        return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+        return !isRefill && !isAdjustment && !countedAtRefill;
       })
       .reduce((sum, e) => sum + e.amount, 0);
-  }, [currentMonthExpenses]);
+  }, [currentMonthExpenses, rule]);
 
   const totalBancomat = useMemo(() => {
     return currentMonthExpenses
@@ -209,30 +203,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return lastMonthExpenses
       .filter((e) => {
         let isRefill = e.description.toLowerCase().includes("ricarica");
-        if (
-          isRefill &&
-          e.paymentMethod === PaymentMethod.Revolut &&
-          e.category === "Benzina"
-        )
-          isRefill = false;
+        if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
 
         const isAdjustment =
           e.description.toLowerCase().includes("aggiustamento") ||
           e.description.toLowerCase().includes("modifica");
-        const isBenzinaAppQ8 =
-          e.category === "Benzina" &&
-          (e.paymentMethod === PaymentMethod.AppQ8 ||
-            e.paymentMethod === ("App Club Q8" as any));
+        const countedAtRefill = isCountedAtRefill(e, rule);
 
         return (
           !isRefill &&
           !isAdjustment &&
-          !isBenzinaAppQ8 &&
+          !countedAtRefill &&
           !isFuture(parseDate(e.date))
         );
       })
       .reduce((sum, e) => sum + e.amount, 0);
-  }, [expenses, currentMonthDate]);
+  }, [expenses, currentMonthDate, rule]);
 
   const diff =
     totalLastMonth > 0
@@ -306,22 +292,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const categoryData = useMemo(() => {
     const realSpending = currentMonthExpenses.filter((e) => {
       let isRefill = e.description.toLowerCase().includes("ricarica");
-      if (
-        isRefill &&
-        e.paymentMethod === PaymentMethod.Revolut &&
-        e.category === "Benzina"
-      )
-        isRefill = false;
+      if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
 
       const isAdjustment =
         e.description.toLowerCase().includes("aggiustamento") ||
         e.description.toLowerCase().includes("modifica");
-      const isBenzinaAppQ8 =
-        e.category === "Benzina" &&
-        (e.paymentMethod === PaymentMethod.AppQ8 ||
-          e.paymentMethod === ("App Club Q8" as any));
+      const countedAtRefill = isCountedAtRefill(e, rule);
 
-      return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+      return !isRefill && !isAdjustment && !countedAtRefill;
     });
 
     const data: Record<string, number> = {};
@@ -332,7 +310,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       .map(([name, value]) => ({ name, value }))
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [currentMonthExpenses]);
+  }, [currentMonthExpenses, rule]);
 
   // DATI GRAFICO STORICO (BAR CHART)
   const historyData = useMemo(() => {
@@ -351,22 +329,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           // Stessa logica di "Calculated Total"
           let isRefill = e.description.toLowerCase().includes("ricarica");
-          if (
-            isRefill &&
-            e.paymentMethod === PaymentMethod.Revolut &&
-            e.category === "Benzina"
-          )
-            isRefill = false;
+          if (isRefill && refillCountsAsSpending(e, rule)) isRefill = false;
 
           const isAdjustment =
             e.description.toLowerCase().includes("aggiustamento") ||
             e.description.toLowerCase().includes("modifica");
-          const isBenzinaAppQ8 =
-            e.category === "Benzina" &&
-            (e.paymentMethod === PaymentMethod.AppQ8 ||
-              e.paymentMethod === ("App Club Q8" as any));
+          const countedAtRefill = isCountedAtRefill(e, rule);
 
-          return !isRefill && !isAdjustment && !isBenzinaAppQ8;
+          return !isRefill && !isAdjustment && !countedAtRefill;
         })
         .reduce((sum, e) => sum + e.amount, 0);
 

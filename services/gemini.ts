@@ -41,9 +41,9 @@ export const getGeminiInsights = async (expenses: Expense[]) => {
   }
 };
 
-export const analyzeReceipt = async (base64Image: string) => {
+export const analyzeReceipt = async (base64Image: string, categories: string[] = [], paymentMethods: string[] = []) => {
   try {
-    const { receipt } = await callGemini({ action: "receipt", image: base64Image });
+    const { receipt } = await callGemini({ action: "receipt", image: base64Image, categories, paymentMethods });
     return receipt || null;
   } catch (error) {
     console.error("Receipt analysis failed:", error);

@@ -54,11 +54,18 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
     }
   }, [initialData, categories]);
 
-  const handleReceiptDetected = (data: { description: string; amount: number; category: string; paymentMethod?: PaymentMethod }) => {
+  // Gemini sceglie tra i nomi dei portafogli dell'utente (più Bancomat): qui li riporto al metodo di pagamento
+  const paymentOptions = [
+    { name: PaymentMethod.Bancomat as string, method: PaymentMethod.Bancomat },
+    ...wallets.map(w => ({ name: w.name, method: w.method }))
+  ];
+
+  const handleReceiptDetected = (data: { description: string; amount: number; category: string; paymentMethod?: string }) => {
     if (data.description) setDescription(data.description);
     if (data.amount > 0) setAmount(data.amount.toString());
     if (categories.some(c => c.name === data.category)) setCategory(data.category);
-    if (data.paymentMethod && [PaymentMethod.Bancomat, ...wallets.map(w => w.method)].includes(data.paymentMethod)) setPaymentMethod(data.paymentMethod);
+    const option = paymentOptions.find(o => o.name === data.paymentMethod);
+    if (option) setPaymentMethod(option.method);
     setShowScanner(false);
   };
 
@@ -221,7 +228,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
       {showScanner && createPortal(
         <div className="fixed inset-0 z-[200]">
-          <ReceiptScanner onDetected={handleReceiptDetected} onClose={() => setShowScanner(false)} />
+          <ReceiptScanner onDetected={handleReceiptDetected} onClose={() => setShowScanner(false)} categories={categories.map(c => c.name)} paymentMethods={paymentOptions.map(o => o.name)} />
         </div>,
         document.body
       )}

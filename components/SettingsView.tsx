@@ -5,6 +5,7 @@ import { User, DollarSign, Trash2, Download, Moon, Sun, LogOut, FileDown, Histor
 import { auth, db } from '../services/supabase';
 import { format } from 'date-fns';
 import { HistoryView } from './HistoryView';
+import { SpendingRuleCard } from './SpendingRuleCard';
 import { translations } from '../utils/i18n';
 
 const SettingsRow = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) => (
@@ -534,6 +535,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       </div>
+
+      <SpendingRuleCard settings={settings} onUpdate={onUpdate} />
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><FileDown className="text-emerald-500" size={20} /> {t.dataArchive}</h3>
