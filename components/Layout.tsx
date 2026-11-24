@@ -117,8 +117,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
       {/* Header Desktop */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-emerald-100 dark:border-gray-800">
-        <div className="max-w-none xl:max-w-6xl mx-auto px-4 min-h-16 py-2 xl:h-16 xl:py-0 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+        <div className="w-full px-4 xl:px-6 min-h-16 py-2 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 shrink-0">
             <div className="flex items-center gap-2">
               <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
                 <PiggyBank className="text-emerald-600 dark:text-emerald-400" size={24} />
@@ -186,7 +186,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
           </div>
         </div>
 
-          <div className="hidden md:flex flex-wrap xl:flex-nowrap items-center justify-end gap-1 min-w-0 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
+          <div className="hidden md:flex flex-wrap items-center justify-end gap-1 min-w-0 bg-white dark:bg-gray-800 p-1 rounded-xl border border-emerald-50 dark:border-gray-700">
             <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={18} />} label={t.dashboard} />
             <NavButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<List size={18} />} label={t.expenses} />
             <NavButton active={activeTab === 'conto'} onClick={() => setActiveTab('conto')} icon={<Landmark size={18} />} label={t.bank} />
@@ -299,14 +299,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 const NavButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-1.5 xl:gap-2 px-2 lg:px-2.5 xl:px-3 py-2 rounded-lg transition-all ${
+    className={`flex items-center gap-1.5 min-[1366px]:gap-2 px-2 lg:px-2.5 min-[1366px]:px-3 py-2 rounded-lg transition-all ${
       active 
         ? 'bg-emerald-500 text-white shadow-md font-semibold' 
         : 'text-emerald-600 dark:text-gray-400 hover:bg-emerald-50 dark:hover:bg-gray-700/50'
     }`}
   >
     {icon}
-    <span className="text-xs lg:text-[13px] xl:text-sm whitespace-nowrap xl:whitespace-normal">{label}</span>
+    <span className="text-xs lg:text-[13px] min-[1366px]:text-sm whitespace-nowrap">{label}</span>
   </button>
 );
 
