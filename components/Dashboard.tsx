@@ -580,15 +580,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* --- SALDI PORTAFOGLI --- */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-emerald-100 dark:border-gray-700 shadow-sm">
         <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 ml-2">
           Saldi Portafogli (Cumulativi)
         </h3>
-        <div className="flex gap-4 px-2">
+        <div className="flex gap-4 overflow-x-auto scrollbar-desktop-only snap-x snap-mandatory scroll-pl-8 -mx-6 px-8 pb-3">
           {balances.map((wallet) => (
             <div
               key={wallet.name}
-              className="flex-shrink-0 w-40 p-4 rounded-2xl bg-emerald-50/50 dark:bg-gray-700/50 border border-emerald-100/50 dark:border-gray-600"
+              className="flex-shrink-0 snap-start w-40 p-4 rounded-2xl bg-emerald-50/50 dark:bg-gray-700/50 border border-emerald-100/50 dark:border-gray-600"
             >
               <div className="flex justify-between items-center mb-2">
                 <div className={wallet.color}>{wallet.icon}</div>

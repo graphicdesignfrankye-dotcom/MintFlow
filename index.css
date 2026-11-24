@@ -1,0 +1,63 @@
+/* Barre di scorrimento: sottili e in tinta con il tema (menta) al posto di quelle grigie di sistema */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #a7f3d0 transparent;
+}
+.dark * {
+  scrollbar-color: #374151 transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #a7f3d0;
+  border-radius: 9999px;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: #374151;
+}
+
+/* Elementi che scorrono senza mostrare la barra (menu in basso, filtri, liste nei riquadri) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Liste con barra sottile ben visibile (categorie e metodi di pagamento nel modulo spese) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #6ee7b7 transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #6ee7b7;
+}
+.dark .custom-scrollbar {
+  scrollbar-color: #4b5563 transparent;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+}
+
+/* Righe che scorrono in orizzontale (es. saldi dei portafogli): barra nascosta su telefono, sottile da tablet in su */
+.scrollbar-desktop-only {
+  scrollbar-width: none;
+}
+.scrollbar-desktop-only::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 768px) {
+  .scrollbar-desktop-only {
+    scrollbar-width: thin;
+  }
+  .scrollbar-desktop-only::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+  }
+}

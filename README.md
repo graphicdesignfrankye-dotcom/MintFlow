@@ -25,6 +25,7 @@ MintFlow è una web app (PWA) per tenere sotto controllo le spese mensili, con s
 ### Contocorrente
 - Scheda dedicata al conto: mostra il **saldo attuale**, le entrate e le uscite del mese e l'elenco dei movimenti raggruppati per mese.
 - L'elenco contiene tutte le spese pagate con **Bancomat** (comprese le ricariche dei portafogli) e le entrate che aggiungi.
+- La scheda **Mesi** mostra l'andamento mese per mese, come l'analisi di Revolut: saldo a fine mese, entrate, uscite e netto, con un grafico a barre degli ultimi sei mesi (a scelta Saldo, Entrate o Uscite). Si cambia mese con le frecce o toccando una barra, e sotto compaiono i movimenti di quel mese.
 - Il tasto **Aggiungi entrata** registra, per esempio, lo stipendio (con scorciatoie Stipendio, Rimborso, Regalo). Le entrate si possono modificare ed eliminare.
 - Il saldo è cumulativo: entrate meno spese Bancomat, più un saldo di partenza che imposti con la matita (non crea movimenti). I movimenti con data futura risultano "in programma" e non sono ancora sottratti.
 - Le entrate non entrano nei totali delle spese e non compaiono nella scheda Extra.
@@ -106,6 +107,7 @@ Altri comandi:
 ```
 ├── index.html            Pagina di ingresso, meta tag, icone e manifest
 ├── index.tsx             Avvio di React
+├── index.css             Stile delle barre di scorrimento (sottili, in tinta menta)
 ├── App.tsx               Stato dell'app, sincronizzazione, autenticazione, routing tra le schede
 ├── types.ts              Tipi condivisi (Expense, UserSettings, WalletConfig, ...)
 ├── components/
