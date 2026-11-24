@@ -1241,14 +1241,8 @@ const App: React.FC = () => {
       currentProfile={userSettings.currentProfile}
       onRefresh={() => fetchExpenses(false)}
     >
-      <div
-        className={`mx-auto px-4 py-8 pb-24 relative ${
-          // Tutte le schede si allargano con lo schermo, tranne AI Insights che resta stretta
-          activeTab !== "ai"
-            ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl"
-            : "max-w-4xl"
-        }`}
-      >
+      {/* Tutte le schede si allargano con la larghezza dello schermo */}
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8 pb-24 relative">
         {successToast && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">
             {successToast}
