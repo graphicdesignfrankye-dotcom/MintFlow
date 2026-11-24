@@ -1243,8 +1243,8 @@ const App: React.FC = () => {
     >
       <div
         className={`mx-auto px-4 py-8 pb-24 relative ${
-          // Dashboard, Spese e Contocorrente si allargano con lo schermo; le altre schede restano strette
-          activeTab === "dashboard" || activeTab === "list" || activeTab === "conto"
+          // Tutte le schede si allargano con lo schermo, tranne AI Insights che resta stretta
+          activeTab !== "ai"
             ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl"
             : "max-w-4xl"
         }`}
