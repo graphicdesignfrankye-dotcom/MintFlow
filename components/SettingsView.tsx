@@ -304,7 +304,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   
   if (view === 'wallets') return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8 pb-32">
         <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
         <h2 className="text-2xl md:text-3xl font-bold dark:text-white mb-6">{t.manageWallets}</h2>
         <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">
@@ -350,7 +350,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   if (view === 'categories') return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-32">
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8 pb-32">
         <button type="button" onClick={() => { setView('main'); setIsAdding(false); }} className="flex items-center gap-2 text-emerald-600 font-bold mb-6"><ChevronLeft /> {tNav.settings}</button>
         <h2 className="text-2xl md:text-3xl font-bold dark:text-white mb-6">{t.manageCategories}</h2>
         <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-[2.5rem] border border-emerald-100 dark:border-gray-700 shadow-sm space-y-4">

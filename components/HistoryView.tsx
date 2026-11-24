@@ -191,7 +191,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
     return (
       <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
-        <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+        <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8 pb-24">
           <header className="flex items-center justify-between mb-8">
             <button 
               onClick={() => { setSelectedMonth(null); setFilterCategory('Tutti'); }}
@@ -346,7 +346,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
   return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[80] overflow-y-auto animate-in slide-in-from-right duration-300">
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8 pb-24">
         <header className="flex items-center justify-between mb-8">
           <button 
             onClick={onClose}
