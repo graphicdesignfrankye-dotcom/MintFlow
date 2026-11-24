@@ -1241,7 +1241,14 @@ const App: React.FC = () => {
       currentProfile={userSettings.currentProfile}
       onRefresh={() => fetchExpenses(false)}
     >
-      <div className="max-w-4xl mx-auto px-4 py-8 pb-24 relative">
+      <div
+        className={`mx-auto px-4 py-8 pb-24 relative ${
+          // Dashboard, Spese e Contocorrente si allargano con lo schermo; le altre schede restano strette
+          activeTab === "dashboard" || activeTab === "list" || activeTab === "conto"
+            ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl"
+            : "max-w-4xl"
+        }`}
+      >
         {successToast && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top-4">
             {successToast}
