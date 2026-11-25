@@ -9,6 +9,7 @@ import { RicaricheView } from "./components/RicaricheView";
 import { SubscriptionsView } from "./components/SubscriptionsView";
 import { ExtraView } from "./components/ExtraView";
 import { ContoCorrenteView } from "./components/ContoCorrenteView";
+import { PendingInbox } from "./components/PendingInbox";
 import { Auth } from "./components/Auth";
 import { AdminDashboard } from "./components/AdminDashboard";
 import {
@@ -18,6 +19,7 @@ import {
   WalletConfig,
   CategoryConfig,
   ProfileType,
+  PendingExpense,
 } from "./types";
 import {
   Plus,
@@ -28,7 +30,8 @@ import {
   LogOut,
   ShieldCheck,
 } from "lucide-react";
-import { db, auth, supabase } from "./services/supabase";
+import { db, auth, supabase, pending } from "./services/supabase";
+import { cardKeyOf, PendingSuggestion } from "./utils/pendingSuggestions";
 import { createDefaultSettings } from "./utils/defaultSettings";
 import {
   mergeSavedSettings,
@@ -268,6 +271,60 @@ const App: React.FC = () => {
   >("dashboard");
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState<Partial<Expense> | null>(null);
+
+  // Pagamenti automatici (Apple Pay) in attesa di conferma
+  const [pendingItems, setPendingItems] = useState<PendingExpense[]>([]);
+  const [pendingSource, setPendingSource] = useState<PendingExpense | null>(null);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setPendingItems([]);
+      return;
+    }
+    let cancelled = false;
+    const loadPending = async () => {
+      try {
+        const list = await pending.list(userId);
+        if (!cancelled) setPendingItems(list);
+      } catch (e) {
+        // tabella non ancora creata o rete assente: la funzione resta semplicemente vuota
+        console.warn("Bozze da confermare non disponibili:", e);
+      }
+    };
+    loadPending();
+
+    const channelName = `pending-expenses-${userId}`;
+    const existing = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${channelName}`);
+    if (existing) supabase.removeChannel(existing);
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "pending_expenses",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => loadPending(),
+      )
+      .subscribe();
+
+    // Se il telefono si è addormentato il realtime può perdere un evento: ricarico quando l'app torna visibile
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadPending();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
 
   // --- LOGICA DI SICUREZZA INFALLIBILE ---
   useEffect(() => {
@@ -961,6 +1018,70 @@ const App: React.FC = () => {
     }
   };
 
+  const removePending = (id: string) =>
+    setPendingItems((prev) => prev.filter((p) => p.id !== id));
+
+  // Ricorda a quale portafoglio appartiene la carta, così dalla prossima volta viene proposto da solo
+  const learnCardWallet = (card: string | null, method: string) => {
+    const key = cardKeyOf(card);
+    if (!key || userSettings.cardWallets?.[key] === method) return;
+    setUserSettings((prev) => ({
+      ...prev,
+      cardWallets: { ...(prev.cardWallets || {}), [key]: method },
+    }));
+  };
+
+  const pendingToExpense = (
+    p: PendingExpense,
+    s: PendingSuggestion,
+  ): Partial<Expense> => ({
+    description: p.merchant,
+    amount: Math.abs(p.amount),
+    category: s.category,
+    paymentMethod: s.paymentMethod,
+    date: format(new Date(p.occurred_at), "yyyy-MM-dd"),
+  });
+
+  const markPending = async (p: PendingExpense, status: "confirmed" | "dismissed") => {
+    removePending(p.id);
+    try {
+      await pending.setStatus(p.id, status);
+    } catch (e) {
+      console.error("Errore aggiornamento bozza:", e);
+      // la bozza resta in attesa sul server: al prossimo caricamento ricompare
+    }
+  };
+
+  // Conferma con un tocco: categoria e portafoglio sono già noti
+  const handleConfirmPending = async (p: PendingExpense, s: PendingSuggestion) => {
+    const base = pendingToExpense(p, s);
+    await handleSaveExpense(
+      {
+        description: base.description!,
+        amount: base.amount!,
+        category: base.category!,
+        paymentMethod: base.paymentMethod!,
+        date: base.date!,
+        isSubscription: false,
+        isExtra: false,
+      },
+      { editId: null },
+    );
+    learnCardWallet(p.card, base.paymentMethod as string);
+    await markPending(p, "confirmed");
+  };
+
+  // Apre il modulo già compilato per completare o correggere
+  const handleEditPending = (p: PendingExpense, s: PendingSuggestion) => {
+    setPendingSource(p);
+    setPrefill(pendingToExpense(p, s));
+    setShowForm(true);
+  };
+
+  const handleDismissPending = async (p: PendingExpense) => {
+    await markPending(p, "dismissed");
+  };
+
   const handleDeleteExpense = async (id: string) => {
     try {
       setIsSyncing(true);
@@ -1240,6 +1361,17 @@ const App: React.FC = () => {
       lang={userSettings.language}
       currentProfile={userSettings.currentProfile}
       onRefresh={() => fetchExpenses(false)}
+      pendingCount={pendingItems.length}
+      onOpenPending={() => {
+        setActiveTab("list");
+        setTimeout(
+          () =>
+            document
+              .getElementById("pending-inbox")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          50,
+        );
+      }}
     >
       {/* Tutte le schede si allargano con la larghezza dello schermo */}
       <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8 pb-24 relative">
@@ -1264,6 +1396,14 @@ const App: React.FC = () => {
         )}
         {activeTab === "list" && (
           <div className="space-y-6">
+            <PendingInbox
+              items={pendingItems}
+              expenses={allExpenses}
+              settings={userSettings}
+              onConfirm={handleConfirmPending}
+              onEdit={handleEditPending}
+              onDismiss={handleDismissPending}
+            />
             <button
               onClick={() => {
                 setPrefill(null);
@@ -1382,7 +1522,10 @@ const App: React.FC = () => {
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-2 sm:p-4">
             <div className="bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-md p-5 sm:p-8 shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)] border-2 border-emerald-500/20 relative animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto no-scrollbar">
               <button
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setPendingSource(null);
+                }}
                 className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
               >
                 <X size={24} />
@@ -1391,8 +1534,19 @@ const App: React.FC = () => {
                 {prefill?.id ? "Modifica Spesa" : "Nuova Spesa"}
               </h2>
               <ExpenseForm
-                onSubmit={handleSaveExpense}
-                onCancel={() => setShowForm(false)}
+                onSubmit={async (data) => {
+                  const source = pendingSource;
+                  await handleSaveExpense(data);
+                  if (source) {
+                    setPendingSource(null);
+                    learnCardWallet(source.card, data.paymentMethod as string);
+                    await markPending(source, "confirmed");
+                  }
+                }}
+                onCancel={() => {
+                  setShowForm(false);
+                  setPendingSource(null);
+                }}
                 initialData={prefill || undefined}
                 currency={userSettings.currency}
                 wallets={userSettings.wallets}

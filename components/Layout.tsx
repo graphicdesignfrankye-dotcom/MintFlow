@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, List, Landmark, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft, Bell, X, Trash2, Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, List, Landmark, BrainCircuit, PiggyBank, Settings, Zap, Repeat, ArrowRightLeft, Bell, X, Trash2, Mail, CheckCircle2, AlertTriangle, Inbox } from 'lucide-react';
 import { translations } from '../utils/i18n';
 import { ProfileType, AppNotification } from '../types';
 import { supabase, db } from '../services/supabase';
@@ -13,9 +13,11 @@ interface LayoutProps {
   lang?: 'it' | 'en';
   currentProfile?: ProfileType;
   onRefresh?: () => void;
+  pendingCount?: number;     // pagamenti automatici in attesa di conferma
+  onOpenPending?: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it', currentProfile = 'personal', onRefresh }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, lang = 'it', currentProfile = 'personal', onRefresh, pendingCount = 0, onOpenPending }) => {
   const t = translations[lang].nav;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotifListOpen, setIsNotifListOpen] = useState(false);
@@ -140,6 +142,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 </button>
               )}
               
+              {pendingCount > 0 && onOpenPending && (
+                <button
+                  onClick={onOpenPending}
+                  className="p-2 rounded-xl transition-all relative text-amber-500 hover:bg-amber-50 dark:hover:bg-gray-800"
+                  title="Spese da confermare"
+                >
+                  <Inbox size={20} />
+                  <span className="absolute top-1 right-1 bg-amber-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                </button>
+              )}
+
               <div className="relative">
                 <button 
                   onClick={() => setIsNotifListOpen(!isNotifListOpen)}

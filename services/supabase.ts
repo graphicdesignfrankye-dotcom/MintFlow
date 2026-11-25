@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Expense, PaymentMethod, ProfileType, AppNotification } from '../types';
+import { Expense, PaymentMethod, ProfileType, AppNotification, PendingExpense, ApiToken } from '../types';
 
 const SUPABASE_URL = 'https://jpcweqcqysxgzycftzyv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_qdb7pW6R-6vvGaoeuGE5fw_xuPgZweE';
@@ -225,5 +225,41 @@ export const db = {
     } catch (e) {
       return false;
     }
+  }
+};
+
+// Pagamenti automatici (Apple Pay): bozze in attesa e codici personali. Le tabelle sono protette da RLS.
+export const pending = {
+  async list(userId: string): Promise<PendingExpense[]> {
+    const { data, error } = await supabase
+      .from('pending_expenses')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .order('occurred_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((r: any) => ({ ...r, amount: Number(r.amount) })) as PendingExpense[];
+  },
+  async setStatus(id: string, status: 'confirmed' | 'dismissed') {
+    const { error } = await supabase.from('pending_expenses').update({ status }).eq('id', id);
+    if (error) throw error;
+  },
+  async listTokens(userId: string): Promise<ApiToken[]> {
+    const { data, error } = await supabase
+      .from('api_tokens')
+      .select('id,label,created_at,last_used_at,revoked_at')
+      .eq('user_id', userId)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []) as ApiToken[];
+  },
+  async createToken(userId: string, tokenHash: string, label = 'Apple Pay') {
+    const { error } = await supabase.from('api_tokens').insert({ user_id: userId, token_hash: tokenHash, label });
+    if (error) throw error;
+  },
+  async revokeToken(id: string) {
+    const { error } = await supabase.from('api_tokens').update({ revoked_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
   }
 };

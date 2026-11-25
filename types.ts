@@ -69,6 +69,7 @@ export interface UserSettings {
   spendingRule?: SpendingRule; // se manca (utenti già esistenti) vale la regola storica, vedi utils/spendingRule.ts
   bankBalanceOffset?: number; // Saldo di partenza/correzione manuale del Contocorrente
   budgetHistory?: Record<string, { personal: number; joint?: number }>; // Storico budget per mese (YYYY-MM)
+  cardWallets?: Record<string, string>; // nome carta in Wallet (minuscolo) -> metodo di pagamento, imparato alla prima conferma
 }
 
 export interface AiInsight {
@@ -84,4 +85,25 @@ export interface AppNotification {
   message: string;
   is_read: boolean;
   created_at: string;
+}
+// Pagamento ricevuto in automatico (Apple Pay) e in attesa di conferma
+export interface PendingExpense {
+  id: string;
+  user_id: string;
+  merchant: string;
+  amount: number;       // negativo = rimborso
+  currency: string;     // codice ISO, per es. "EUR"
+  card: string | null;
+  occurred_at: string;
+  source: string;
+  status: 'pending' | 'confirmed' | 'dismissed';
+  created_at: string;
+}
+
+export interface ApiToken {
+  id: string;
+  label: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
 }
