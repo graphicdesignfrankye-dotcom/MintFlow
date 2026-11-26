@@ -31,6 +31,24 @@ MintFlow è una web app (PWA) per tenere sotto controllo le spese mensili, con s
 - Il saldo è cumulativo: entrate meno spese Bancomat, più un saldo di partenza che imposti con la matita (non crea movimenti). I movimenti con data futura risultano "in programma" e non sono ancora sottratti.
 - Le entrate non entrano nei totali delle spese e non compaiono nella scheda Extra.
 
+### Pagamenti automatici (Apple Pay)
+- Quando paghi con Apple Pay, l'iPhone invia la spesa a MintFlow, che la mette in **Da confermare**. Ogni pagamento resta una bozza finché non lo confermi tu.
+- **Da confermare** compare in cima alla scheda Spese e come icona con contatore accanto alla campanella. Le bozze arrivano in tempo reale, senza ricaricare.
+- Per ogni bozza puoi **Confermare** con un tocco, **Modificare** (si apre il modulo già compilato) o **Scartare**. La prima volta che un esercente compare chiede la categoria ("Completa"); dalle volte successive categoria e portafoglio sono già proposti, in base allo storico dello stesso esercente.
+- Il collegamento carta → portafoglio (per esempio "Revolut Visa" → Portafoglio 1) viene imparato alla prima conferma, oppure proposto dal nome della carta se somiglia a quello di un portafoglio.
+- Rimborsi (importo negativo) e pagamenti in una valuta diversa da quella dell'app vengono segnalati e non registrati in automatico: i rimborsi si scartano e, se serve, si aggiungono a mano; la valuta estera si inserisce con "Modifica".
+- Un invio ripetuto dello stesso pagamento (il Comando che riparte) non crea una seconda bozza.
+- **Disponibile solo con iPhone e Apple Pay.** Altri tipi di pagamento o di telefono non sono coperti.
+
+**Come si attiva** (per ogni utente):
+1. In Impostazioni → **Pagamenti automatici** tocca "Genera il codice" e copialo: viene mostrato una sola volta. Nel database resta solo la sua impronta, e puoi revocarlo quando vuoi.
+2. Sull'iPhone apri **Comandi → Automazione → +**, scegli **Transazione**, imposta le carte (anche "Qualsiasi carta") ed **Esegui immediatamente**, e disattiva "Avvisa".
+3. Aggiungi l'azione **Ottieni contenuti dell'URL**: indirizzo `https://<il-tuo-sito>/api/pending`, metodo **POST**.
+4. In **Intestazioni** aggiungi `Authorization` con valore `Bearer ` seguito dal tuo codice (uno spazio in mezzo).
+5. In **Corpo della richiesta** scegli **JSON** e aggiungi tre campi di testo con le variabili della transazione: `esercente` (Esercente), `importo` (Importo) e `carta` (Carta o biglietto). Facoltativo: `data` con la data corrente in formato ISO 8601; se manca, vale l'ora di arrivo.
+
+La guida con gli stessi passaggi è anche nell'app, sotto la scheda "Pagamenti automatici".
+
 ### Abbonamenti
 - Una spesa può essere segnata come *abbonamento ricorrente*.
 - Elenco degli abbonamenti attivi con costo mensile fisso.
@@ -110,7 +128,7 @@ Altri comandi:
 ├── index.tsx             Avvio di React
 ├── index.css             Stile delle barre di scorrimento (sottili, in tinta menta)
 ├── App.tsx               Stato dell'app, sincronizzazione, autenticazione, routing tra le schede
-├── types.ts              Tipi condivisi (Expense, UserSettings, WalletConfig, ...)
+├── types.ts              Tipi condivisi (Expense, UserSettings, WalletConfig, PendingExpense, ...)
 ├── components/
 │   ├── Layout.tsx        Intestazione, navigazione, notifiche
 │   ├── Dashboard.tsx     Riepilogo e grafici
@@ -124,26 +142,34 @@ Altri comandi:
 │   ├── AiInsights.tsx    Consigli generati da Gemini
 │   ├── SettingsView.tsx  Profilo, portafogli, categorie, CSV, sicurezza
 │   ├── SpendingRuleCard.tsx  Scelta della regola "spese già contate alla ricarica"
+│   ├── AutoPaymentsCard.tsx  Codice personale e guida al Comando per i pagamenti automatici
+│   ├── PendingInbox.tsx  Casella "Da confermare" (bozze dei pagamenti automatici)
 │   ├── Auth.tsx          Accesso e registrazione
 │   ├── AdminDashboard.tsx  Pannello amministratore
 │   ├── SmartCategorizer.tsx  Suggerimento categoria
 │   ├── ReceiptScanner.tsx    Lettura scontrini con Gemini
 │   └── ConfirmModal.tsx  Finestra di conferma
 ├── api/
-│   └── gemini.ts         Funzione server (Vercel): unico punto che usa la chiave Gemini
+│   ├── gemini.ts         Funzione server (Vercel): unico punto che usa la chiave Gemini
+│   └── pending.ts        Funzione server (Vercel): riceve i pagamenti dal Comando dell'iPhone
+├── sql/
+│   └── pending-expenses.sql  Tabelle, regole di accesso e funzione per i pagamenti automatici (da eseguire una volta su Supabase)
 ├── services/
 │   ├── supabase.ts       Client Supabase, autenticazione e accesso ai dati
 │   └── gemini.ts         Chiamate a /api/gemini
 ├── utils/i18n.ts         Traduzioni italiano / inglese
 ├── utils/spendingRule.ts Regola "spese già contate alla ricarica" (valori di partenza e calcolo)
+├── utils/apiToken.ts     Generazione del codice personale e della sua impronta sha256
+├── utils/pendingSuggestions.ts  Proposta di categoria e portafoglio per le bozze
 └── public/               Icone, favicon e manifest della PWA
 ```
 
 ## Note tecniche
 
-- **Tabelle Supabase**: `profiles` (impostazioni, ruolo, stato attivo/disabilitato), `expenses` e `notifications`.
+- **Tabelle Supabase**: `profiles` (impostazioni, ruolo, stato attivo/disabilitato), `expenses` e `notifications`, più `api_tokens` e `pending_expenses` per i pagamenti automatici (create da `sql/pending-expenses.sql`).
 - **Formato delle spese**: nella tabella `expenses` il metodo di pagamento, l'abbonamento, il profilo e i dati "Extra" sono salvati nel campo `description`, separati da ` |#| `. Va tenuto presente se leggi i dati direttamente dal database.
 - **Cache locale**: le spese sono in `localStorage` alla chiave `mintflow_cache_v2`, le impostazioni in `mintflow_user_settings`.
 - **PWA**: icone e manifest sono in `public/` e vengono copiati nella build. Su iPhone e Android l'app si può aggiungere alla schermata Home.
 - **Chiave Gemini**: non arriva mai al browser. Le chiamate passano da `api/gemini.ts`, una funzione server di Vercel che verifica il token di accesso Supabase dell'utente, costruisce i prompt lato server, accetta immagini fino a circa 3 MB e limita a 10 richieste al minuto per utente (controllo per istanza, quindi indicativo). Su Vercel crea la variabile `GEMINI_API_KEY` (senza prefisso `VITE_`); in locale mettila in `.env.local`, e `npm run dev` serve `/api/gemini` da solo. Conviene impostare anche una quota giornaliera su Google Cloud.
+- **Pagamenti automatici, lato server**: `api/pending.ts` riceve il POST del Comando con il codice in `Authorization: Bearer`, legge l'importo anche in formato italiano (`4,30 €`, `1.234,56 €`) e chiama la funzione `ingest_pending_expense` del database. Sul server non c'è nessuna chiave segreta: solo la chiave pubblica di Supabase. È la funzione, che gira nel database, a controllare il codice (confronto con l'impronta sha256 salvata in `api_tokens`) e a scrivere la bozza solo per il proprietario di quel codice. Le bozze entrano solo da lì (`pending_expenses` non ha policy di inserimento) e sono protette da RLS; ci sono limiti anti-abuso (20 bozze al minuto, 500 in attesa) e un codice revocato smette subito di funzionare. Prima di usare la funzione esegui `sql/pending-expenses.sql` nell'SQL Editor di Supabase: si può rieseguire senza danni.
 - **Variabili `VITE_`**: finiscono nel codice inviato al browser. Non ci vanno mai messi segreti, in particolare la service role key di Supabase.

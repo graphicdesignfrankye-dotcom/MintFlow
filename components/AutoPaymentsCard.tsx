@@ -111,13 +111,13 @@ export const AutoPaymentsCard: React.FC<AutoPaymentsCardProps> = ({ userId }) =>
       title: 'Imposta il corpo della richiesta',
       body: (
         <>
-          In <b>Corpo della richiesta</b> scegli <b>JSON</b> e aggiungi quattro campi di tipo testo, usando le variabili della transazione:
+          In <b>Corpo della richiesta</b> scegli <b>JSON</b> e aggiungi tre campi di tipo testo, usando le variabili della transazione:
           <ul className="mt-2 space-y-1 text-[12px]">
             <li><code className="font-mono">esercente</code> → variabile <b>Esercente</b></li>
             <li><code className="font-mono">importo</code> → variabile <b>Importo</b></li>
             <li><code className="font-mono">carta</code> → variabile <b>Carta o biglietto</b></li>
-            <li><code className="font-mono">data</code> → <b>Data corrente</b>, formattata come <b>ISO 8601</b></li>
           </ul>
+          <p className="mt-2 text-[12px] text-gray-400">Facoltativo: un campo <code className="font-mono">data</code> con la <b>Data corrente</b> in formato <b>ISO 8601</b>. Se manca, vale l'ora di arrivo.</p>
         </>
       )
     },
