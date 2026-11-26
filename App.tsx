@@ -1078,6 +1078,23 @@ const App: React.FC = () => {
     setShowForm(true);
   };
 
+  // Rimborso: si registra come entrata sul Contocorrente (Bancomat), come le altre entrate
+  const handleConfirmRefund = async (p: PendingExpense) => {
+    await handleSaveExpense(
+      {
+        description: `Rimborso ${p.merchant}`,
+        amount: Math.abs(p.amount),
+        category: "Entrata",
+        paymentMethod: PaymentMethod.Bancomat,
+        date: format(new Date(p.occurred_at), "yyyy-MM-dd"),
+        isExtra: true,
+        extraType: "income",
+      },
+      { editId: null },
+    );
+    await markPending(p, "confirmed");
+  };
+
   const handleDismissPending = async (p: PendingExpense) => {
     await markPending(p, "dismissed");
   };
@@ -1402,6 +1419,7 @@ const App: React.FC = () => {
               settings={userSettings}
               onConfirm={handleConfirmPending}
               onEdit={handleEditPending}
+              onConfirmRefund={handleConfirmRefund}
               onDismiss={handleDismissPending}
             />
             <button

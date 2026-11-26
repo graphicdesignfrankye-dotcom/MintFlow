@@ -9,13 +9,14 @@ interface PendingInboxProps {
   settings: UserSettings;
   onConfirm: (p: PendingExpense, s: PendingSuggestion) => Promise<void>;
   onEdit: (p: PendingExpense, s: PendingSuggestion) => void;
+  onConfirmRefund: (p: PendingExpense) => Promise<void>;
   onDismiss: (p: PendingExpense) => Promise<void>;
 }
 
 const formatWhen = (iso: string) =>
   new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-export const PendingInbox: React.FC<PendingInboxProps> = ({ items, expenses, settings, onConfirm, onEdit, onDismiss }) => {
+export const PendingInbox: React.FC<PendingInboxProps> = ({ items, expenses, settings, onConfirm, onEdit, onConfirmRefund, onDismiss }) => {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const rows = useMemo(
@@ -64,7 +65,7 @@ export const PendingInbox: React.FC<PendingInboxProps> = ({ items, expenses, set
                 <p className="mt-3 text-[11px] font-bold text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
                   <AlertTriangle size={14} className="shrink-0 mt-px" />
                   {refund
-                    ? 'È un rimborso: non lo registro come spesa. Scartalo e, se serve, aggiungilo a mano.'
+                    ? 'È un rimborso: lo puoi registrare come entrata sul Contocorrente (Bancomat) oppure scartarlo.'
                     : `Importo in ${p.currency}: controlla il cambio e inseriscilo a mano con "Modifica".`}
                 </p>
               ) : (
@@ -79,6 +80,17 @@ export const PendingInbox: React.FC<PendingInboxProps> = ({ items, expenses, set
               )}
 
               <div className="mt-4 flex gap-2">
+                {refund && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => run(p.id, () => onConfirmRefund(p))}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Registra come entrata
+                  </button>
+                )}
                 {!refund && !foreign && (
                   <button
                     type="button"
@@ -113,7 +125,7 @@ export const PendingInbox: React.FC<PendingInboxProps> = ({ items, expenses, set
                   type="button"
                   disabled={busy}
                   onClick={() => run(p.id, () => onDismiss(p))}
-                  className={`${refund ? 'flex-1' : ''} flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-red-500 bg-red-50 dark:bg-red-900/10 text-xs font-bold hover:bg-red-100 transition-all active:scale-95 disabled:opacity-50`}
+                  className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-red-500 bg-red-50 dark:bg-red-900/10 text-xs font-bold hover:bg-red-100 transition-all active:scale-95 disabled:opacity-50`}
                 >
                   <X size={14} /> Scarta
                 </button>

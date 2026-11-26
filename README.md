@@ -36,7 +36,7 @@ MintFlow è una web app (PWA) per tenere sotto controllo le spese mensili, con s
 - **Da confermare** compare in cima alla scheda Spese e come icona con contatore accanto alla campanella. Le bozze arrivano in tempo reale, senza ricaricare.
 - Per ogni bozza puoi **Confermare** con un tocco, **Modificare** (si apre il modulo già compilato) o **Scartare**. La prima volta che un esercente compare chiede la categoria ("Completa"); dalle volte successive categoria e portafoglio sono già proposti, in base allo storico dello stesso esercente.
 - Il collegamento carta → portafoglio (per esempio "Revolut Visa" → Portafoglio 1) viene imparato alla prima conferma, oppure proposto dal nome della carta se somiglia a quello di un portafoglio.
-- Rimborsi (importo negativo) e pagamenti in una valuta diversa da quella dell'app vengono segnalati e non registrati in automatico: i rimborsi si scartano e, se serve, si aggiungono a mano; la valuta estera si inserisce con "Modifica".
+- Rimborsi (importo negativo) e pagamenti in una valuta diversa da quella dell'app vengono segnalati e non registrati come spesa: un rimborso si registra con un tocco come entrata sul Contocorrente (Bancomat) oppure si scarta; la valuta estera si inserisce con "Modifica".
 - Un invio ripetuto dello stesso pagamento (il Comando che riparte) non crea una seconda bozza.
 - **Disponibile solo con iPhone e Apple Pay.** Altri tipi di pagamento o di telefono non sono coperti.
 
